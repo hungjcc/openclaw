@@ -29,6 +29,7 @@ import VOLCENGINE_MANIFEST from "../../extensions/volcengine/openclaw.plugin.jso
 import XAI_MANIFEST from "../../extensions/xai/openclaw.plugin.json" with { type: "json" };
 import XIAOMI_MANIFEST from "../../extensions/xiaomi/openclaw.plugin.json" with { type: "json" };
 import ZAI_MANIFEST from "../../extensions/zai/openclaw.plugin.json" with { type: "json" };
+import ZENMUX_MANIFEST from "../../extensions/zenmux/openclaw.plugin.json" with { type: "json" };
 
 type ProviderAuthEnvVarManifest = {
   id?: string;
@@ -90,4 +91,5 @@ export const BUNDLED_PROVIDER_AUTH_ENV_VAR_CANDIDATES = collectBundledProviderAu
   XAI_MANIFEST,
   XIAOMI_MANIFEST,
   ZAI_MANIFEST,
+  ZENMUX_MANIFEST,
 ]);
