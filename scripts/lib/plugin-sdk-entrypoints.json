@@ -52,6 +52,7 @@
   "diagnostics-otel",
   "diffs",
   "feishu",
+  "google-antigravity-auth",
   "googlechat",
   "irc",
   "llm-task",
