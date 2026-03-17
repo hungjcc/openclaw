@@ -46,6 +46,7 @@ const BUNDLED_WEB_SEARCH_CREDENTIAL_VALUES: Readonly<Record<string, unknown>> = 
   google: "AIza-test",
   moonshot: "sk-test",
   perplexity: "pplx-test",
+  tavily: "tvly-test",
   xai: "xai-test",
 };
 

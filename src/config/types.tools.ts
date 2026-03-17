@@ -487,6 +487,8 @@ export type ToolsConfig = {
       kimi?: WebSearchLegacyProviderConfig;
       /** @deprecated Legacy Perplexity scoped config. */
       perplexity?: WebSearchLegacyProviderConfig;
+      /** @deprecated Legacy Tavily scoped config. */
+      tavily?: WebSearchLegacyProviderConfig;
     };
     fetch?: {
       /** Enable web fetch tool (default: true). */
