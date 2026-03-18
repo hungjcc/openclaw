@@ -11,7 +11,7 @@ import zaiPlugin from "../../../extensions/zai/index.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { withBundledPluginEnablementCompat } from "../bundled-compat.js";
 import { resolveBundledWebSearchPluginIds } from "../bundled-web-search.js";
-import { createCapturedPluginRegistration } from "../captured-registration.js";
+import { capturePluginRegistration } from "../captured-registration.js";
 import { loadOpenClawPlugins } from "../loader.js";
 import { createPluginLoaderLogger } from "../logger.js";
 import { resolvePluginProviders } from "../providers.js";
@@ -23,10 +23,7 @@ import type {
   WebSearchProviderPlugin,
 } from "../types.js";
 
-type RegistrablePlugin = {
-  id: string;
-  register: (api: ReturnType<typeof createCapturedPluginRegistration>["api"]) => void;
-};
+type RegistrablePlugin = Parameters<typeof capturePluginRegistration>[0] & { id: string };
 
 type CapabilityContractEntry<T> = {
   pluginId: string;
@@ -100,22 +97,23 @@ const staticBundledProviderPlugins: RegistrablePlugin[] = [
   zaiPlugin,
 ];
 
-function captureRegistrations(plugin: RegistrablePlugin) {
-  const captured = createCapturedPluginRegistration();
-  plugin.register(captured.api);
-  return captured;
-}
-
 function buildStaticProviderEntries(): ProviderContractEntry[] {
   return staticBundledProviderPlugins.flatMap((plugin) => {
-    const captured = captureRegistrations(plugin);
+    const captured = capturePluginRegistration(plugin);
     return captured.providers.map((provider) => ({ pluginId: plugin.id, provider }));
   });
 }
 
 function loadBundledProviderRegistry(): ProviderContractEntry[] {
   // Start with statically-imported providers (reliable in all vitest pool modes).
-  const staticEntries = buildStaticProviderEntries();
+  // Wrapped in try so a plugin register() failure degrades gracefully.
+  let staticEntries: ProviderContractEntry[] = [];
+  try {
+    staticEntries = buildStaticProviderEntries();
+  } catch (error) {
+    providerContractLoadError = error instanceof Error ? error : new Error(String(error));
+    return staticEntries;
+  }
   const staticPluginIdSet = new Set(staticBundledProviderPlugins.map((p) => p.id));
 
   // Supplement with jiti-loaded providers for the ~23 bundled plugins not in
