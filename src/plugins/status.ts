@@ -111,7 +111,6 @@ function buildCompatibilityNoticesForInspect(
   return warnings;
 }
 
-
 const log = createSubsystemLogger("plugins");
 
 export function buildPluginStatusReport(params?: {
