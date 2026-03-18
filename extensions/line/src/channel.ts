@@ -13,6 +13,7 @@ import {
   type ChannelStatusIssue,
   type LineConfig,
   type LineChannelData,
+  type OpenClawConfig,
   type ResolvedLineAccount,
 } from "../api.js";
 import { lineConfigAdapter } from "./config-adapter.js";

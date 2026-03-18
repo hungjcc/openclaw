@@ -16,6 +16,7 @@ const LEGACY_ALLOWLIST = new Set<string>([
   "extensions/slack/src/directory-config.ts",
   "extensions/slack/src/runtime-api.ts",
   "extensions/telegram/src/directory-config.ts",
+  "extensions/telegram/src/bot.media.e2e-harness.ts",
   "extensions/whatsapp/src/directory-config.ts",
   "extensions/xai/src/grok-web-search-provider.ts",
   "extensions/xai/web-search.ts",
@@ -103,7 +104,7 @@ function main() {
       console.error(`- ${offender}`);
     }
     console.error(
-      "Publish a focused openclaw/plugin-sdk/<subpath> seam or use the extension's own public barrel instead.",
+      "Publish a focused openclaw/plugin-sdk/<subpath> surface or use the extension's own public barrel instead.",
     );
     process.exit(1);
   }

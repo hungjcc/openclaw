@@ -723,13 +723,13 @@ export function createAccountScopedGroupAccessSection<TResolved>(params: {
 }
 
 type AccountScopedChannel =
+  | "bluebubbles"
   | "discord"
-  | "slack"
-  | "telegram"
   | "imessage"
   | "line"
   | "signal"
-  | "bluebubbles";
+  | "slack"
+  | "telegram";
 type LegacyDmChannel = "discord" | "slack";
 
 export function patchLegacyDmChannelConfig(params: {
