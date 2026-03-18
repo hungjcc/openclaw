@@ -866,19 +866,6 @@ export type WebSearchProviderContext = {
   runtimeMetadata?: RuntimeWebSearchMetadata;
 };
 
-export type WebSearchCredentialResolutionSource = "config" | "secretRef" | "env" | "missing";
-
-export type WebSearchRuntimeMetadataContext = {
-  config?: OpenClawConfig;
-  searchConfig?: Record<string, unknown>;
-  runtimeMetadata?: RuntimeWebSearchMetadata;
-  resolvedCredential?: {
-    value?: string;
-    source: WebSearchCredentialResolutionSource;
-    fallbackEnvVar?: string;
-  };
-};
-
 export type WebSearchProviderPlugin = {
   id: WebSearchProviderId;
   label: string;
@@ -888,16 +875,8 @@ export type WebSearchProviderPlugin = {
   signupUrl: string;
   docsUrl?: string;
   autoDetectOrder?: number;
-  credentialPath: string;
-  inactiveSecretPaths?: string[];
   getCredentialValue: (searchConfig?: Record<string, unknown>) => unknown;
   setCredentialValue: (searchConfigTarget: Record<string, unknown>, value: unknown) => void;
-  getConfiguredCredentialValue?: (config?: OpenClawConfig) => unknown;
-  setConfiguredCredentialValue?: (configTarget: OpenClawConfig, value: unknown) => void;
-  applySelectionConfig?: (config: OpenClawConfig) => OpenClawConfig;
-  resolveRuntimeMetadata?: (
-    ctx: WebSearchRuntimeMetadataContext,
-  ) => Partial<RuntimeWebSearchMetadata> | Promise<Partial<RuntimeWebSearchMetadata>>;
   createTool: (ctx: WebSearchProviderContext) => WebSearchProviderToolDefinition | null;
 };
 
@@ -1664,6 +1643,7 @@ export type PluginHookMessageSentEvent = {
   content: string;
   success: boolean;
   error?: string;
+  metadata?: Record<string, unknown>;
 };
 
 // Tool context

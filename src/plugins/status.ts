@@ -79,7 +79,6 @@ export type PluginInspectReport = {
     hasAllowedModelsConfig: boolean;
   };
   usesLegacyBeforeAgentStart: boolean;
-  compatibility: PluginCompatibilityNotice[];
 };
 
 function buildCompatibilityNoticesForInspect(
@@ -106,6 +105,7 @@ function buildCompatibilityNoticesForInspect(
   }
   return warnings;
 }
+
 
 const log = createSubsystemLogger("plugins");
 
@@ -220,17 +220,6 @@ export function buildPluginInspectReport(params: {
   const diagnostics = report.diagnostics.filter((entry) => entry.pluginId === plugin.id);
   const policyEntry = normalizePluginsConfig(config.plugins).entries[plugin.id];
   const capabilityCount = capabilities.length;
-  const shape = deriveInspectShape({
-    capabilityCount,
-    typedHookCount: typedHooks.length,
-    customHookCount: customHooks.length,
-    toolCount: tools.length,
-    commandCount: plugin.commands.length,
-    cliCount: plugin.cliCommands.length,
-    serviceCount: plugin.services.length,
-    gatewayMethodCount: plugin.gatewayMethods.length,
-    httpRouteCount: plugin.httpRoutes,
-  });
 
   // Populate MCP server info for bundle-format plugins with a known rootDir.
   let mcpServers: PluginInspectReport["mcpServers"] = [];
@@ -252,6 +241,17 @@ export function buildPluginInspectReport(params: {
     ];
   }
 
+  const shape = deriveInspectShape({
+    capabilityCount,
+    typedHookCount: typedHooks.length,
+    customHookCount: customHooks.length,
+    toolCount: tools.length,
+    commandCount: plugin.commands.length,
+    cliCount: plugin.cliCommands.length,
+    serviceCount: plugin.services.length,
+    gatewayMethodCount: plugin.gatewayMethods.length,
+    httpRouteCount: plugin.httpRoutes,
+  });
   const usesLegacyBeforeAgentStart = typedHooks.some(
     (entry) => entry.name === "before_agent_start",
   );

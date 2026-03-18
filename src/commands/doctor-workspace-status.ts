@@ -2,7 +2,6 @@ import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent
 import { buildWorkspaceSkillStatus } from "../agents/skills-status.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { loadOpenClawPlugins } from "../plugins/loader.js";
-import { buildPluginCompatibilityWarnings } from "../plugins/status.js";
 import { note } from "../terminal/note.js";
 import { detectLegacyWorkspaceDirs, formatLegacyWorkspaceWarning } from "./doctor-workspace.js";
 
@@ -62,17 +61,6 @@ export function noteWorkspaceStatus(cfg: OpenClawConfig) {
     }
 
     note(lines.join("\n"), "Plugins");
-  }
-  const compatibilityWarnings = buildPluginCompatibilityWarnings({
-    config: cfg,
-    workspaceDir,
-    report: {
-      workspaceDir,
-      ...pluginRegistry,
-    },
-  });
-  if (compatibilityWarnings.length > 0) {
-    note(compatibilityWarnings.map((line) => `- ${line}`).join("\n"), "Plugin compatibility");
   }
   if (pluginRegistry.diagnostics.length > 0) {
     const lines = pluginRegistry.diagnostics.map((diag) => {
