@@ -1365,6 +1365,7 @@ export type PluginHookName =
   | "before_model_resolve"
   | "before_prompt_build"
   | "before_agent_start"
+  | "after_agent_complete"
   | "llm_input"
   | "llm_output"
   | "agent_end"
@@ -1392,6 +1393,7 @@ export const PLUGIN_HOOK_NAMES = [
   "before_model_resolve",
   "before_prompt_build",
   "before_agent_start",
+  "after_agent_complete",
   "llm_input",
   "llm_output",
   "agent_end",
@@ -1429,6 +1431,7 @@ export const isPluginHookName = (hookName: unknown): hookName is PluginHookName 
 export const PROMPT_INJECTION_HOOK_NAMES = [
   "before_prompt_build",
   "before_agent_start",
+  "after_agent_complete",
 ] as const satisfies readonly PluginHookName[];
 
 export type PromptInjectionHookName = (typeof PROMPT_INJECTION_HOOK_NAMES)[number];
@@ -1449,6 +1452,8 @@ export type PluginHookAgentContext = {
   trigger?: string;
   /** Channel identifier (e.g. "telegram", "discord", "whatsapp"). */
   channelId?: string;
+  /** Conversation target (e.g. group ID, DM address). */
+  conversationId?: string;
 };
 
 // before_model_resolve hook
@@ -1530,6 +1535,24 @@ export const stripPromptMutationFieldsFromLegacyHookResult = (
   return Object.keys(remaining).length > 0
     ? (remaining as PluginHookBeforeAgentStartOverrideResult)
     : undefined;
+};
+
+// after_agent_complete hook — fires after agent produces a response, before delivery
+export type PluginHookAfterAgentCompleteEvent = {
+  sessionKey: string;
+  channelId: string;
+  channelKey: string;
+  /** Conversation target (e.g. group ID, DM address). */
+  conversationId?: string;
+  agentId: string;
+  response: string;
+  processingStartedAt: number;
+};
+
+export type PluginHookAfterAgentCompleteResult = {
+  reinject?: boolean;
+  injectContext?: string;
+  suppress?: boolean;
 };
 
 // llm_input hook
@@ -1876,6 +1899,13 @@ export type PluginHookHandlerMap = {
     event: PluginHookBeforeAgentStartEvent,
     ctx: PluginHookAgentContext,
   ) => Promise<PluginHookBeforeAgentStartResult | void> | PluginHookBeforeAgentStartResult | void;
+  after_agent_complete: (
+    event: PluginHookAfterAgentCompleteEvent,
+    ctx: PluginHookAgentContext,
+  ) =>
+    | Promise<PluginHookAfterAgentCompleteResult | void>
+    | PluginHookAfterAgentCompleteResult
+    | void;
   llm_input: (event: PluginHookLlmInputEvent, ctx: PluginHookAgentContext) => Promise<void> | void;
   llm_output: (
     event: PluginHookLlmOutputEvent,
