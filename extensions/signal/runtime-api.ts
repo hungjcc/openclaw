@@ -1,2 +1,2 @@
-export * from "openclaw/plugin-sdk/signal";
-export * from "openclaw/plugin-sdk/signal-core";
+export * from "./src/index.js";
+export type { SignalAccountConfig } from "openclaw/plugin-sdk/signal";
