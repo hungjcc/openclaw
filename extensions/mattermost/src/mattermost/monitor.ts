@@ -88,6 +88,7 @@ import {
   cleanupSlashCommands,
   isSlashCommandsEnabled,
   loadPersistedSlashCommands,
+  mergePersistedSlashCommands,
   removePersistedSlashCommands,
   registerSlashCommands,
   resolveCallbackUrl,
@@ -472,6 +473,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
       });
 
       const allRegistered: import("./slash-commands.js").MattermostRegisteredCommand[] = [];
+      const successfullyRefreshedTeamIds = new Set<string>();
       let teamRegistrationFailures = 0;
 
       for (const team of teams) {
@@ -485,12 +487,28 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             cachedCommands: cachedSlashCommands,
             log: (msg) => runtime.log?.(msg),
           });
+          successfullyRefreshedTeamIds.add(team.id);
           allRegistered.push(...registered);
         } catch (err) {
           teamRegistrationFailures += 1;
           runtime.error?.(
             `mattermost: failed to register slash commands for team ${team.id}: ${String(err)}`,
           );
+        }
+      }
+
+      if (slashCommandCachePath && successfullyRefreshedTeamIds.size > 0) {
+        const mergedCachedCommands = mergePersistedSlashCommands({
+          cachedCommands: cachedSlashCommands,
+          registeredCommands: allRegistered,
+          refreshedTeamIds: successfullyRefreshedTeamIds,
+        });
+        if (mergedCachedCommands.length > 0) {
+          await savePersistedSlashCommands(slashCommandCachePath, mergedCachedCommands, (msg) =>
+            runtime.log?.(msg),
+          );
+        } else {
+          await removePersistedSlashCommands(slashCommandCachePath, (msg) => runtime.log?.(msg));
         }
       }
 
@@ -511,12 +529,6 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
           if (cmd.originalName) {
             triggerMap.set(cmd.trigger, cmd.originalName);
           }
-        }
-
-        if (slashCommandCachePath) {
-          await savePersistedSlashCommands(slashCommandCachePath, allRegistered, (msg) =>
-            runtime.log?.(msg),
-          );
         }
 
         activateSlashCommands({
