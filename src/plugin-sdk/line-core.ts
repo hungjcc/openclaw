@@ -3,7 +3,6 @@ export type { LineConfig } from "../line/types.js";
 export {
   DEFAULT_ACCOUNT_ID,
   formatDocsLink,
-  normalizeAccountId,
   setSetupChannelEnabled,
   setTopLevelChannelDmPolicyWithAllowFrom,
   splitSetupEntries,
@@ -11,6 +10,9 @@ export {
 export type { ChannelSetupAdapter, ChannelSetupDmPolicy, ChannelSetupWizard } from "./setup.js";
 export {
   listLineAccountIds,
+  normalizeAccountId,
   resolveDefaultLineAccountId,
   resolveLineAccount,
 } from "../line/accounts.js";
+export type { ResolvedLineAccount } from "../line/types.js";
+export { LineConfigSchema } from "../line/config-schema.js";
