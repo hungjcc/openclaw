@@ -440,6 +440,18 @@ export async function createEmbeddingProvider(
     }
 
     // Try remote providers in order
+    // First, try any custom plugin providers (non-builtin IDs)
+    for (const [pid, pp] of Object.entries(pluginProviders)) {
+      if (
+        !REMOTE_EMBEDDING_PROVIDER_IDS.includes(
+          pid as (typeof REMOTE_EMBEDDING_PROVIDER_IDS)[number],
+        )
+      ) {
+        return { provider: pp, requestedProvider };
+      }
+    }
+
+    // Then try built-in remote providers
     for (const pid of REMOTE_EMBEDDING_PROVIDER_IDS) {
       // Check plugin first
       const pp = pluginProviders[pid];

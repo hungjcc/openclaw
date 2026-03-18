@@ -726,15 +726,27 @@ export async function textToSpeech(params: {
           | undefined;
 
         // Get defaults from config when not overridden
-        const providerConfig = config[provider as keyof typeof config] as
+        // Check ResolvedTtsConfig first, then fall back to models.providers
+        const ttsConfigDefaults = config[provider as keyof typeof config] as
+          | { model?: string; modelId?: string; voice?: string; voiceId?: string }
+          | undefined;
+        const modelsProviderDefaults = params.cfg.models?.providers?.[provider] as
           | { model?: string; modelId?: string; voice?: string; voiceId?: string }
           | undefined;
         const result = await pluginTtsProvider.textToSpeech({
           text: params.text,
-          model: providerOverrides?.model ?? providerConfig?.model,
-          modelId: providerOverrides?.modelId ?? providerConfig?.modelId,
-          voice: providerOverrides?.voice ?? providerConfig?.voice,
-          voiceId: providerOverrides?.voiceId ?? providerConfig?.voiceId,
+          model:
+            providerOverrides?.model ?? ttsConfigDefaults?.model ?? modelsProviderDefaults?.model,
+          modelId:
+            providerOverrides?.modelId ??
+            ttsConfigDefaults?.modelId ??
+            modelsProviderDefaults?.modelId,
+          voice:
+            providerOverrides?.voice ?? ttsConfigDefaults?.voice ?? modelsProviderDefaults?.voice,
+          voiceId:
+            providerOverrides?.voiceId ??
+            ttsConfigDefaults?.voiceId ??
+            modelsProviderDefaults?.voiceId,
           apiKey,
           baseUrl,
           headers,
@@ -878,15 +890,19 @@ export async function textToSpeechTelephony(params: {
         const fetchFn = resolveProxyFetchFromEnv();
         const headers = resolveTtsProviderHeaders(params.cfg, provider);
         const baseUrl = resolveTtsProviderBaseUrl(config, params.cfg, provider);
-        const providerConfig = config[provider as keyof typeof config] as
+        // Check ResolvedTtsConfig first, then fall back to models.providers
+        const ttsConfigDefaults = config[provider as keyof typeof config] as
+          | { model?: string; modelId?: string; voice?: string; voiceId?: string }
+          | undefined;
+        const modelsProviderDefaults = params.cfg.models?.providers?.[provider] as
           | { model?: string; modelId?: string; voice?: string; voiceId?: string }
           | undefined;
         const result = await pluginTtsProvider.textToSpeech({
           text: params.text,
-          model: providerConfig?.model,
-          modelId: providerConfig?.modelId,
-          voice: providerConfig?.voice,
-          voiceId: providerConfig?.voiceId,
+          model: ttsConfigDefaults?.model ?? modelsProviderDefaults?.model,
+          modelId: ttsConfigDefaults?.modelId ?? modelsProviderDefaults?.modelId,
+          voice: ttsConfigDefaults?.voice ?? modelsProviderDefaults?.voice,
+          voiceId: ttsConfigDefaults?.voiceId ?? modelsProviderDefaults?.voiceId,
           apiKey,
           baseUrl,
           headers,

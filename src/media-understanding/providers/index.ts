@@ -100,8 +100,9 @@ export function buildMediaUnderstandingRegistry(
     const merged = existing
       ? {
           ...existing,
+          // Union capabilities from both plugin and built-in (keep all)
+          capabilities: [...(existing.capabilities ?? []), ...(provider.capabilities ?? [])],
           // Only override with plugin methods that are actually defined
-          ...(provider.capabilities !== undefined && { capabilities: provider.capabilities }),
           ...(provider.transcribeAudio !== undefined && {
             transcribeAudio: provider.transcribeAudio,
           }),

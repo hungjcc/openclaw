@@ -594,25 +594,44 @@ export async function runProviderEntry(params: {
     let audioResult: { text: string; model?: string };
 
     const transcribeFn = provider.transcribeAudio;
-    audioResult = await executeWithApiKeyRotation({
-      provider: providerId,
-      apiKeys,
-      execute: async (apiKey) =>
-        transcribeFn({
-          buffer: media.buffer,
-          fileName: media.fileName,
-          mime: media.mime,
-          apiKey,
-          baseUrl,
-          headers,
-          model,
-          language: entry.language ?? params.config?.language ?? cfg.tools?.media?.audio?.language,
-          prompt,
-          query: providerQuery,
-          timeoutMs,
-          fetchFn,
-        }),
-    });
+    // For keyless plugin providers, bypass API-key rotation and call directly
+    if (isPluginProvider && apiKeys.length === 0) {
+      audioResult = await transcribeFn({
+        buffer: media.buffer,
+        fileName: media.fileName,
+        mime: media.mime,
+        apiKey: "",
+        baseUrl,
+        headers,
+        model,
+        language: entry.language ?? params.config?.language ?? cfg.tools?.media?.audio?.language,
+        prompt,
+        query: providerQuery,
+        timeoutMs,
+        fetchFn,
+      });
+    } else {
+      audioResult = await executeWithApiKeyRotation({
+        provider: providerId,
+        apiKeys,
+        execute: async (apiKey) =>
+          transcribeFn({
+            buffer: media.buffer,
+            fileName: media.fileName,
+            mime: media.mime,
+            apiKey,
+            baseUrl,
+            headers,
+            model,
+            language:
+              entry.language ?? params.config?.language ?? cfg.tools?.media?.audio?.language,
+            prompt,
+            query: providerQuery,
+            timeoutMs,
+            fetchFn,
+          }),
+      });
+    }
     return {
       kind: "audio.transcription",
       attachmentIndex: params.attachmentIndex,
@@ -660,23 +679,39 @@ export async function runProviderEntry(params: {
   let videoResult: { text: string; model?: string };
 
   const describeVideoFn = provider.describeVideo;
-  videoResult = await executeWithApiKeyRotation({
-    provider: providerId,
-    apiKeys,
-    execute: (apiKey) =>
-      describeVideoFn({
-        buffer: media.buffer,
-        fileName: media.fileName,
-        mime: media.mime,
-        apiKey,
-        baseUrl,
-        headers,
-        model: entry.model,
-        prompt,
-        timeoutMs,
-        fetchFn,
-      }),
-  });
+  // For keyless plugin providers, bypass API-key rotation and call directly
+  if (isPluginProvider && apiKeys.length === 0) {
+    videoResult = await describeVideoFn({
+      buffer: media.buffer,
+      fileName: media.fileName,
+      mime: media.mime,
+      apiKey: "",
+      baseUrl,
+      headers,
+      model: entry.model,
+      prompt,
+      timeoutMs,
+      fetchFn,
+    });
+  } else {
+    videoResult = await executeWithApiKeyRotation({
+      provider: providerId,
+      apiKeys,
+      execute: (apiKey) =>
+        describeVideoFn({
+          buffer: media.buffer,
+          fileName: media.fileName,
+          mime: media.mime,
+          apiKey,
+          baseUrl,
+          headers,
+          model: entry.model,
+          prompt,
+          timeoutMs,
+          fetchFn,
+        }),
+    });
+  }
   return {
     kind: "video.description",
     attachmentIndex: params.attachmentIndex,
