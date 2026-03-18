@@ -770,7 +770,16 @@ async function restoreSubagentRunsOnce(): Promise<void> {
     // runs as "missing-session-entry" orphans and prune them incorrectly.
     // rehydrateSessionStoreEntries is async (writes via updateSessionStore to
     // serialise concurrent store writers during startup through the lock).
-    await rehydrateSessionStoreEntries(subagentRuns);
+    // Pass only the pre-snapshot runs to rehydration so that fresh runs
+    // spawned during the async restore window are excluded (#2950584237).
+    const restoredRunsSnapshot = new Map<string, SubagentRunRecord>();
+    for (const id of restoredRunIds) {
+      const entry = subagentRuns.get(id);
+      if (entry) {
+        restoredRunsSnapshot.set(id, entry);
+      }
+    }
+    await rehydrateSessionStoreEntries(restoredRunsSnapshot);
     if (reconcileOrphanedRestoredRuns(restoredRunIds)) {
       persistSubagentRuns();
     }
