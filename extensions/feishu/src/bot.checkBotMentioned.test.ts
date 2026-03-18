@@ -108,6 +108,32 @@ describe("parseFeishuMessageEvent – mentionedBot", () => {
     expect(ctx.mentionedBot).toBe(false);
   });
 
+  it("returns mentionedBot=false for @_all — bots should not respond to broadcast mentions (#49761)", () => {
+    const event = makeEvent("group", [], "@_all hello everyone");
+    const ctx = parseFeishuMessageEvent(event as any, BOT_OPEN_ID);
+    expect(ctx.mentionedBot).toBe(false);
+  });
+
+  it("returns mentionedBot=true when bot is explicitly mentioned alongside @_all", () => {
+    const event = makeEvent(
+      "group",
+      [{ key: "@_user_1", name: "Bot", id: { open_id: BOT_OPEN_ID } }],
+      "@_all @_user_1 hello",
+    );
+    const ctx = parseFeishuMessageEvent(event as any, BOT_OPEN_ID);
+    expect(ctx.mentionedBot).toBe(true);
+  });
+
+  it("returns mentionedBot=false when @_all is present but only other users are mentioned", () => {
+    const event = makeEvent(
+      "group",
+      [{ key: "@_user_1", name: "Alice", id: { open_id: "ou_alice" } }],
+      "@_all @_user_1 hello",
+    );
+    const ctx = parseFeishuMessageEvent(event as any, BOT_OPEN_ID);
+    expect(ctx.mentionedBot).toBe(false);
+  });
+
   it("treats mention.name regex metacharacters as literals when stripping", () => {
     const event = makeEvent(
       "group",
