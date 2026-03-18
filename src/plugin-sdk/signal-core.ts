@@ -8,3 +8,4 @@ export {
 } from "./channel-plugin-common.js";
 export { SignalConfigSchema } from "../config/zod-schema.providers-core.js";
 export { normalizeE164 } from "../utils.js";
+export { resolveSignalReactionLevel } from "../../extensions/signal/src/reaction-level.js";

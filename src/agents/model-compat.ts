@@ -17,6 +17,13 @@ function extractModelCompat(
   return modelOrCompat as ModelCompatConfig;
 }
 
+export function coerceModelCompatConfig(value: unknown): ModelCompatConfig | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  return value as ModelCompatConfig;
+}
+
 export function applyModelCompatPatch<T extends { compat?: ModelCompatConfig }>(
   model: T,
   patch: ModelCompatConfig,
