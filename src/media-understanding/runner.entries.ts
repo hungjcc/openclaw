@@ -343,6 +343,13 @@ async function resolveProviderExecutionAuth(params: {
   agentDir?: string;
   requireApiKey?: boolean;
 }) {
+  // Skip auth lookup when API key is not required (keyless plugin providers)
+  if (!params.requireApiKey) {
+    return {
+      apiKeys: [],
+      providerConfig: params.cfg.models?.providers?.[params.providerId],
+    };
+  }
   const auth = await resolveApiKeyForProvider({
     provider: params.providerId,
     cfg: params.cfg,
@@ -350,10 +357,7 @@ async function resolveProviderExecutionAuth(params: {
     preferredProfile: params.entry.preferredProfile,
     agentDir: params.agentDir,
   });
-  // Default to not requiring API key - let providers handle missing keys themselves
-  // This allows plugin providers (like local engines) to work without API keys
-  const requireKey = params.requireApiKey !== undefined ? params.requireApiKey : false;
-  const primaryKey = requireKey ? requireApiKey(auth, params.providerId) : (auth.apiKey ?? "");
+  const primaryKey = requireApiKey(auth, params.providerId);
   return {
     apiKeys: collectProviderApiKeysForExecution({
       provider: params.providerId,

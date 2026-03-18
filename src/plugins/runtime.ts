@@ -26,7 +26,7 @@ export function getPluginProvidersByCapability<T extends { id: string }>(
     // Guard against object-shaped capabilities (e.g., { providerFamily: "openai" })
     const caps = p.routingCapabilities;
     const capabilitiesArray = Array.isArray(caps) ? caps : [];
-    const hasCapability = capabilitiesArray.some(capabilityFilter) ?? false;
+    const hasCapability = capabilitiesArray.some(capabilityFilter);
     if (!hasCapability) {
       continue;
     }

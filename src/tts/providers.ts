@@ -32,10 +32,8 @@ export function buildTtsProviderRegistry(
   const registry = new Map<string, TtsProvider>();
 
   const pluginProviders = getPluginTtsProviders();
-  if (pluginProviders) {
-    for (const [key, provider] of Object.entries(pluginProviders)) {
-      registry.set(normalizeProviderId(key), provider);
-    }
+  for (const [key, provider] of Object.entries(pluginProviders)) {
+    registry.set(normalizeProviderId(key), provider);
   }
 
   if (overrides) {

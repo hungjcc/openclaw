@@ -357,28 +357,29 @@ function getPluginEmbeddingProvidersSync(
           );
           return results;
         },
-        embedBatchInputs: async (inputs: EmbeddingInput[]) => {
-          const apiKey = await resolveApiKey();
-          if (embedBatchInputsFn) {
-            const result = await embedBatchInputsFn({
-              inputs: inputs as {
-                text: string;
-                parts?: (
-                  | { type: "text"; text: string }
-                  | { type: "inline-data"; mimeType: string; data: string }
-                )[];
-              }[],
-              model: options.model,
-              apiKey,
-              baseUrl: resolvedBaseUrl,
-              headers: resolvedHeaders,
-              timeoutMs: getEmbeddingTimeout(options),
-              fetchFn,
-            });
-            return result.embeddings;
-          }
-          throw new Error(`Plugin embedding provider ${p.id} does not implement embedBatchInputs`);
-        },
+        ...(embedBatchInputsFn
+          ? {
+              embedBatchInputs: async (inputs: EmbeddingInput[]) => {
+                const apiKey = await resolveApiKey();
+                const result = await embedBatchInputsFn({
+                  inputs: inputs as {
+                    text: string;
+                    parts?: (
+                      | { type: "text"; text: string }
+                      | { type: "inline-data"; mimeType: string; data: string }
+                    )[];
+                  }[],
+                  model: options.model,
+                  apiKey,
+                  baseUrl: resolvedBaseUrl,
+                  headers: resolvedHeaders,
+                  timeoutMs: getEmbeddingTimeout(options),
+                  fetchFn,
+                });
+                return result.embeddings;
+              },
+            }
+          : {}),
       };
     },
   );
@@ -440,14 +441,26 @@ export async function createEmbeddingProvider(
     }
 
     // Try remote providers in order
-    // First, try any custom plugin providers (non-builtin IDs)
+    // First, try any custom plugin providers (non-builtin IDs) with error recovery
+    const customPlugins: { id: string; provider: EmbeddingProvider }[] = [];
     for (const [pid, pp] of Object.entries(pluginProviders)) {
       if (
         !REMOTE_EMBEDDING_PROVIDER_IDS.includes(
           pid as (typeof REMOTE_EMBEDDING_PROVIDER_IDS)[number],
         )
       ) {
-        return { provider: pp, requestedProvider };
+        customPlugins.push({ id: pid, provider: pp });
+      }
+    }
+    // Try each custom plugin, falling back to next if one fails
+    for (const { provider } of customPlugins) {
+      try {
+        // Lightweight readiness check - try a single embedding
+        await provider.embedQuery("test");
+        return { provider, requestedProvider };
+      } catch {
+        // Try next custom plugin
+        continue;
       }
     }
 
