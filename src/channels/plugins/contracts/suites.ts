@@ -43,16 +43,10 @@ function resolveContractMessageDiscovery(params: {
       capabilities: [] as readonly ChannelMessageCapability[],
     };
   }
-  if (actions.describeMessageTool) {
-    const discovery = actions.describeMessageTool({ cfg: params.cfg }) ?? null;
-    return {
-      actions: Array.isArray(discovery?.actions) ? [...discovery.actions] : [],
-      capabilities: Array.isArray(discovery?.capabilities) ? discovery.capabilities : [],
-    };
-  }
+  const discovery = actions.describeMessageTool?.({ cfg: params.cfg }) ?? null;
   return {
-    actions: actions.listActions?.({ cfg: params.cfg }) ?? [],
-    capabilities: actions.getCapabilities?.({ cfg: params.cfg }) ?? [],
+    actions: Array.isArray(discovery?.actions) ? [...discovery.actions] : [],
+    capabilities: Array.isArray(discovery?.capabilities) ? discovery.capabilities : [],
   };
 }
 
@@ -150,9 +144,7 @@ type ChannelActionsContractCase = {
 };
 
 function hasActionsDiscoverySurface(actions: ChannelPlugin["actions"] | undefined): boolean {
-  return (
-    typeof actions?.listActions === "function" || typeof actions?.describeMessageTool === "function"
-  );
+  return typeof actions?.describeMessageTool === "function";
 }
 
 export function installChannelActionsContractSuite(params: {

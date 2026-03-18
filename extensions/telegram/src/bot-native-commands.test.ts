@@ -48,7 +48,7 @@ function createNativeCommandTestParams(
     enqueueSystemEvent: vi.fn(),
     dispatchReplyWithBufferedBlockDispatcher: vi.fn(async () => ({
       queuedFinal: false,
-      counts: {},
+      counts: { tool: 0, block: 0, final: 0 },
     })),
     listSkillCommandsForAgents: skillCommandMocks.listSkillCommandsForAgents,
     wasSentByBot: vi.fn(() => false),

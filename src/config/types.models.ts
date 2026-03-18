@@ -22,13 +22,15 @@ type SupportedOpenAICompatFields = Pick<
   | "supportsUsageInStreaming"
   | "supportsStrictMode"
   | "maxTokensField"
-  | "thinkingFormat"
   | "requiresToolResultName"
   | "requiresAssistantAfterToolResult"
   | "requiresThinkingAsText"
 >;
 
+type SupportedThinkingFormat = NonNullable<OpenAICompletionsCompat["thinkingFormat"]>;
+
 export type ModelCompatConfig = SupportedOpenAICompatFields & {
+  thinkingFormat?: SupportedThinkingFormat | "qwen-chat-template";
   supportsTools?: boolean;
   toolSchemaProfile?: "xai";
   nativeWebSearchTool?: boolean;

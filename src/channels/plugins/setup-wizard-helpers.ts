@@ -722,7 +722,14 @@ export function createAccountScopedGroupAccessSection<TResolved>(params: {
   };
 }
 
-type AccountScopedChannel = "discord" | "slack" | "telegram" | "imessage" | "signal";
+type AccountScopedChannel =
+  | "discord"
+  | "slack"
+  | "telegram"
+  | "imessage"
+  | "line"
+  | "signal"
+  | "bluebubbles";
 type LegacyDmChannel = "discord" | "slack";
 
 export function patchLegacyDmChannelConfig(params: {

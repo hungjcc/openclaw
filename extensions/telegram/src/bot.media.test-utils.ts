@@ -1,5 +1,6 @@
 import * as ssrf from "openclaw/plugin-sdk/infra-runtime";
 import { afterEach, beforeAll, beforeEach, expect, vi, type Mock } from "vitest";
+import type { TelegramBotDeps } from "./bot-deps.js";
 
 type StickerSpy = Mock<(...args: unknown[]) => unknown>;
 
@@ -107,11 +108,15 @@ beforeAll(async () => {
   onSpyRef = harness.onSpy;
   sendChatActionSpyRef = harness.sendChatActionSpy;
   const botModule = await import("./bot.js");
-  botModule.setTelegramBotRuntimeForTest(harness.telegramBotRuntimeForTest);
+  botModule.setTelegramBotRuntimeForTest(
+    harness.telegramBotRuntimeForTest as unknown as NonNullable<
+      Parameters<typeof botModule.setTelegramBotRuntimeForTest>[0]
+    >,
+  );
   createTelegramBotRef = (opts) =>
     botModule.createTelegramBot({
       ...opts,
-      telegramDeps: harness.telegramBotDepsForTest,
+      telegramDeps: harness.telegramBotDepsForTest as unknown as TelegramBotDeps,
     });
   const replyModule = await import("openclaw/plugin-sdk/reply-runtime");
   replySpyRef = (replyModule as unknown as { __replySpy: ReturnType<typeof vi.fn> }).__replySpy;

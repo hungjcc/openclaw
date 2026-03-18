@@ -125,7 +125,10 @@ export function createScopedChannelConfigAdapter<
   sectionKey: string;
   listAccountIds: (cfg: Config) => string[];
   resolveAccount: (cfg: Config, accountId?: string | null) => ResolvedAccount;
-  resolveAccessorAccount?: (params: { cfg: Config; accountId?: string | null }) => AccessorAccount;
+  resolveAccessorAccount?: (params: {
+    cfg: OpenClawConfig;
+    accountId?: string | null;
+  }) => AccessorAccount;
   defaultAccountId: (cfg: Config) => string;
   inspectAccount?: (cfg: Config, accountId?: string | null) => unknown;
   clearBaseFields: string[];
@@ -147,8 +150,8 @@ export function createScopedChannelConfigAdapter<
 > {
   const resolveAccessorAccount =
     params.resolveAccessorAccount ??
-    (({ cfg, accountId }: { cfg: Config; accountId?: string | null }) =>
-      params.resolveAccount(cfg, accountId) as unknown as AccessorAccount);
+    (({ cfg, accountId }: { cfg: OpenClawConfig; accountId?: string | null }) =>
+      params.resolveAccount(cfg as Config, accountId) as unknown as AccessorAccount);
 
   return {
     ...createScopedChannelConfigBase<ResolvedAccount, Config>({
@@ -280,7 +283,10 @@ export function createTopLevelChannelConfigAdapter<
 >(params: {
   sectionKey: string;
   resolveAccount: (cfg: Config) => ResolvedAccount;
-  resolveAccessorAccount?: (params: { cfg: Config; accountId?: string | null }) => AccessorAccount;
+  resolveAccessorAccount?: (params: {
+    cfg: OpenClawConfig;
+    accountId?: string | null;
+  }) => AccessorAccount;
   listAccountIds?: (cfg: Config) => string[];
   defaultAccountId?: (cfg: Config) => string;
   inspectAccount?: (cfg: Config) => unknown;
@@ -301,10 +307,12 @@ export function createTopLevelChannelConfigAdapter<
   | "formatAllowFrom"
   | "resolveDefaultTo"
 > {
-  const resolveAccessorAccount =
+  const resolveAccessorAccount:
+    | ((params: { cfg: OpenClawConfig; accountId?: string | null }) => AccessorAccount)
+    | undefined =
     params.resolveAccessorAccount ??
-    (({ cfg }: { cfg: Config; accountId?: string | null }) =>
-      params.resolveAccount(cfg) as unknown as AccessorAccount);
+    (({ cfg }: { cfg: OpenClawConfig; accountId?: string | null }) =>
+      params.resolveAccount(cfg as Config) as unknown as AccessorAccount);
 
   return {
     ...createTopLevelChannelConfigBase<ResolvedAccount, Config>({
@@ -403,7 +411,10 @@ export function createHybridChannelConfigAdapter<
   sectionKey: string;
   listAccountIds: (cfg: Config) => string[];
   resolveAccount: (cfg: Config, accountId?: string | null) => ResolvedAccount;
-  resolveAccessorAccount?: (params: { cfg: Config; accountId?: string | null }) => AccessorAccount;
+  resolveAccessorAccount?: (params: {
+    cfg: OpenClawConfig;
+    accountId?: string | null;
+  }) => AccessorAccount;
   defaultAccountId: (cfg: Config) => string;
   inspectAccount?: (cfg: Config, accountId?: string | null) => unknown;
   clearBaseFields: string[];
@@ -425,8 +436,8 @@ export function createHybridChannelConfigAdapter<
 > {
   const resolveAccessorAccount =
     params.resolveAccessorAccount ??
-    (({ cfg, accountId }: { cfg: Config; accountId?: string | null }) =>
-      params.resolveAccount(cfg, accountId) as unknown as AccessorAccount);
+    (({ cfg, accountId }: { cfg: OpenClawConfig; accountId?: string | null }) =>
+      params.resolveAccount(cfg as Config, accountId) as unknown as AccessorAccount);
 
   return {
     ...createHybridChannelConfigBase<ResolvedAccount, Config>({

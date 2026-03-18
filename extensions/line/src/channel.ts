@@ -1,5 +1,6 @@
 import { createScopedDmSecurityResolver } from "openclaw/plugin-sdk/channel-config-helpers";
 import { collectAllowlistProviderRestrictSendersWarnings } from "openclaw/plugin-sdk/channel-policy";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import {
   buildChannelConfigSchema,
   buildComputedAccountStatusSnapshot,

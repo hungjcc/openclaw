@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const readConfigFileSnapshot = vi.fn();
-const buildPluginCompatibilityNotices = vi.fn(() => []);
+type PluginCompatibilityNotice = {
+  pluginId: string;
+  code: string;
+  severity: "warn" | "error";
+  message: string;
+};
+const buildPluginCompatibilityNotices = vi.fn<() => PluginCompatibilityNotice[]>(() => []);
 
 vi.mock("../config/config.js", () => ({
   readConfigFileSnapshot,

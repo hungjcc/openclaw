@@ -1,5 +1,6 @@
 import { resetInboundDedupe } from "openclaw/plugin-sdk/reply-runtime";
 import { beforeEach, vi, type Mock } from "vitest";
+import type { TelegramBotDeps } from "./bot-deps.js";
 
 export const useSpy: Mock = vi.fn();
 export const middlewareUseSpy: Mock = vi.fn();
@@ -56,6 +57,10 @@ const apiStub: ApiStub = {
   setMyCommands: vi.fn(async () => undefined),
 };
 
+type TelegramBotRuntimeForTest = NonNullable<
+  Parameters<typeof import("./bot.js").setTelegramBotRuntimeForTest>[0]
+>;
+
 export const telegramBotRuntimeForTest = {
   Bot: class {
     api = apiStub;
@@ -68,7 +73,7 @@ export const telegramBotRuntimeForTest = {
   },
   sequentialize: () => vi.fn(),
   apiThrottler: () => throttlerSpy(),
-};
+} as unknown as TelegramBotRuntimeForTest;
 
 const mediaHarnessReplySpy = vi.hoisted(() =>
   vi.fn(async (_ctx, opts) => {
@@ -78,16 +83,16 @@ const mediaHarnessReplySpy = vi.hoisted(() =>
 );
 const mediaHarnessDispatchReplyWithBufferedBlockDispatcher = vi.hoisted(() =>
   vi.fn(async (params) => {
-    await params.dispatcherOptions?.typingCallbacks?.start?.();
+    await params.dispatcherOptions?.typingCallbacks?.onReplyStart?.();
     const reply = await mediaHarnessReplySpy(params.ctx, params.replyOptions);
     const payloads = reply === undefined ? [] : Array.isArray(reply) ? reply : [reply];
     for (const payload of payloads) {
       await params.dispatcherOptions?.deliver?.(payload, { kind: "final" });
     }
-    return { queuedFinal: false, counts: {} };
+    return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
   }),
 );
-export const telegramBotDepsForTest = {
+export const telegramBotDepsForTest: TelegramBotDeps = {
   loadConfig: () => ({
     channels: { telegram: { dmPolicy: "open", allowFrom: ["*"] } },
   }),
