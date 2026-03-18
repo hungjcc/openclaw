@@ -197,7 +197,7 @@ describe("slackPlugin agentPrompt", () => {
           slack: {
             botToken: "xoxb-test",
             appToken: "xapp-test",
-            capabilities: { interactiveReplies: true },
+            capabilities: ["interactiveReplies"],
           },
         },
       },
