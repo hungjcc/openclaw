@@ -366,14 +366,18 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
           let first = true;
 
           if (info?.kind === "block") {
-            // Drop internal block chunks unless we can safely consume them as
-            // streaming-card fallback content.
-            if (!(streamingEnabled && useCard)) {
-              return;
+            if (streamingEnabled && useCard) {
+              startStreaming();
+              if (streamingStartPromise) {
+                await streamingStartPromise;
+              }
             }
-            startStreaming();
-            if (streamingStartPromise) {
-              await streamingStartPromise;
+            // When streaming is active, the block is consumed via streaming card
+            // update below. Otherwise deliver as a plain message so ACP block
+            // payloads still reach the user even with disableBlockStreaming.
+            if (!streaming?.isActive()) {
+              await sendChunkedTextReply({ text, useCard, infoKind: "block" });
+              return;
             }
           }
 
