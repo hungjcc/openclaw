@@ -92,14 +92,25 @@ describe("TokenStore", () => {
 
   it("saves and consumes OAuth state nonce", () => {
     store.saveState("test-state-123");
-    const consumed = store.consumeState();
-    expect(consumed).toBe("test-state-123");
-    // Second call returns null (consumed)
-    expect(store.consumeState()).toBeNull();
+    expect(store.consumeState("test-state-123")).toBe(true);
+    // Second call returns false (consumed)
+    expect(store.consumeState("test-state-123")).toBe(false);
   });
 
-  it("consumeState returns null when no state saved", () => {
-    expect(store.consumeState()).toBeNull();
+  it("consumeState returns false when no state saved", () => {
+    expect(store.consumeState("anything")).toBe(false);
+  });
+
+  it("preserves multiple state nonces concurrently", () => {
+    store.saveState("state-a");
+    store.saveState("state-b");
+    store.saveState("state-c");
+    // All three should be valid
+    expect(store.consumeState("state-a")).toBe(true);
+    expect(store.consumeState("state-c")).toBe(true);
+    expect(store.consumeState("state-b")).toBe(true);
+    // All consumed
+    expect(store.consumeState("state-a")).toBe(false);
   });
 
   it("creates directory if it does not exist", () => {

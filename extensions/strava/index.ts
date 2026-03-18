@@ -54,8 +54,7 @@ const stravaPlugin = {
           const error = url.searchParams.get("error");
 
           // Validate OAuth state nonce to prevent CSRF.
-          const expectedState = tokenStore.consumeState();
-          if (!expectedState || state !== expectedState) {
+          if (!state || !tokenStore.consumeState(state)) {
             res.statusCode = 403;
             res.setHeader("Content-Type", "text/html");
             res.end(

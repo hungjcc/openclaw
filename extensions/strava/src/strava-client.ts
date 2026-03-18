@@ -2,7 +2,7 @@ import type { StravaActivity, StravaActivityDetail, StravaAthleteStats } from ".
 
 const BASE_URL = "https://www.strava.com/api/v3";
 
-class StravaApiError extends Error {
+export class StravaApiError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -82,6 +82,17 @@ export async function getActivity(
   activityId: number,
 ): Promise<StravaActivityDetail> {
   return stravaFetch<StravaActivityDetail>(token, `/activities/${activityId}`);
+}
+
+/** Lightweight check that the token is still valid (calls /athlete). */
+export async function verifyToken(token: string): Promise<boolean> {
+  try {
+    await stravaFetch<unknown>(token, "/athlete");
+    return true;
+  } catch (err) {
+    if (err instanceof StravaApiError && err.status === 401) return false;
+    throw err;
+  }
 }
 
 /** Get aggregated stats for an athlete. */

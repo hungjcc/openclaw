@@ -146,20 +146,45 @@ export class TokenStore {
     }
   }
 
-  /** Store an OAuth state nonce for CSRF validation. */
+  /** Store an OAuth state nonce for CSRF validation. Keeps the last 5 nonces so
+   *  multiple auth URLs can be valid concurrently (e.g. agent asks twice, user
+   *  opens a second tab). */
   saveState(state: string): void {
     fs.mkdirSync(this.dir, { recursive: true });
-    fs.writeFileSync(this.statePath(), JSON.stringify({ state }), { mode: 0o600 });
+    const existing = this.loadStates();
+    // Keep most recent 4 + the new one = 5 max.
+    const states = [...existing.slice(-4), state];
+    fs.writeFileSync(this.statePath(), JSON.stringify({ states }), { mode: 0o600 });
   }
 
-  /** Load and consume the stored OAuth state nonce. Returns null if none exists. */
-  consumeState(): string | null {
+  /** Check if a state nonce is valid and consume it. Returns true if matched. */
+  consumeState(state: string): boolean {
+    const states = this.loadStates();
+    const idx = states.indexOf(state);
+    if (idx === -1) return false;
+    states.splice(idx, 1);
+    try {
+      if (states.length === 0) {
+        fs.unlinkSync(this.statePath());
+      } else {
+        fs.writeFileSync(this.statePath(), JSON.stringify({ states }), { mode: 0o600 });
+      }
+    } catch {
+      // best-effort cleanup
+    }
+    return true;
+  }
+
+  private loadStates(): string[] {
     try {
       const raw = fs.readFileSync(this.statePath(), "utf-8");
-      fs.unlinkSync(this.statePath());
-      return (JSON.parse(raw) as { state: string }).state;
+      const data = JSON.parse(raw) as { state?: string; states?: string[] };
+      // Handle legacy single-state format gracefully.
+      if (data.states) return [...data.states];
+      if (data.state) return [data.state];
+      return [];
     } catch {
-      return null;
+      return [];
     }
   }
 }

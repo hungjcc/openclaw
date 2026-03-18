@@ -56,6 +56,13 @@ function createAuthStatusTool(deps: ToolDeps) {
       const token = await getTokenOrNull(deps);
       if (!token) return notConnectedResult(deps);
 
+      // Verify the token is actually valid against Strava (catches revoked apps).
+      const valid = await client.verifyToken(token);
+      if (!valid) {
+        deps.tokenStore.clear();
+        return notConnectedResult(deps);
+      }
+
       return {
         content: [
           {
@@ -110,20 +117,37 @@ function createActivitiesTool(deps: ToolDeps) {
       const before = params.before as string | undefined;
       const sportType = params.sportType as string | undefined;
 
-      // When filtering by sport type, fetch extra pages to compensate for
-      // mixed-sport results being filtered out client-side.
-      const fetchSize = sportType ? Math.min(count * 3, 200) : count;
-
-      let activities = await client.getActivities(token, {
-        perPage: fetchSize,
-        after,
-        before,
-      });
+      let activities: Awaited<ReturnType<typeof client.getActivities>>;
 
       if (sportType) {
-        activities = activities
-          .filter((a) => a.sport_type.toLowerCase() === sportType.toLowerCase())
-          .slice(0, count);
+        // Paginate until we collect enough matching activities (Strava has no
+        // server-side sport filter). Cap at 5 pages to avoid excessive requests.
+        activities = [];
+        const pageSize = 50; // max Strava allows
+        const maxPages = 5;
+        for (let page = 1; page <= maxPages; page++) {
+          const batch = await client.getActivities(token, {
+            perPage: pageSize,
+            page,
+            after,
+            before,
+          });
+          for (const a of batch) {
+            if (a.sport_type.toLowerCase() === sportType.toLowerCase()) {
+              activities.push(a);
+              if (activities.length >= count) break;
+            }
+          }
+          // Stop if we have enough results or the page was not full (no more data).
+          if (activities.length >= count || batch.length < pageSize) break;
+        }
+        activities = activities.slice(0, count);
+      } else {
+        activities = await client.getActivities(token, {
+          perPage: count,
+          after,
+          before,
+        });
       }
 
       const formatted = activities.map((a) => ({
