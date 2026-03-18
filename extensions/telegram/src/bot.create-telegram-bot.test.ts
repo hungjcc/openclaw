@@ -59,6 +59,7 @@ const TELEGRAM_TEST_TIMINGS = {
   mediaGroupFlushMs: 20,
   textFragmentGapMs: 30,
 } as const;
+const EMPTY_REPLY_COUNTS = { block: 0, final: 0, tool: 0 } as const;
 
 describe("createTelegramBot", () => {
   beforeAll(() => {
@@ -388,7 +389,7 @@ describe("createTelegramBot", () => {
     dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(
       async ({ dispatcherOptions }) => {
         await dispatcherOptions.typingCallbacks?.onReplyStart?.();
-        return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
+        return { queuedFinal: false, counts: { ...EMPTY_REPLY_COUNTS } };
       },
     );
     createTelegramBot({ token: "tok" });
@@ -1463,7 +1464,7 @@ describe("createTelegramBot", () => {
       dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(async (params) => {
         dispatchCall = params as typeof dispatchCall;
         await params.dispatcherOptions.typingCallbacks?.onReplyStart?.();
-        return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
+        return { queuedFinal: false, counts: { ...EMPTY_REPLY_COUNTS } };
       });
       loadConfig.mockReturnValue({
         channels: {
@@ -1483,6 +1484,9 @@ describe("createTelegramBot", () => {
         continue;
       }
       if (testCase.assertTopicMetadata) {
+        if (!payload) {
+          throw new Error("Expected forum dispatch payload");
+        }
         expect(payload.SessionKey).toContain("telegram:group:-1001234567890:topic:99");
         expect(payload.From).toBe("telegram:group:-1001234567890:topic:99");
         expect(payload.MessageThreadId).toBe(99);
@@ -1796,7 +1800,7 @@ describe("createTelegramBot", () => {
       | undefined;
     dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(async (params) => {
       dispatchCall = params as typeof dispatchCall;
-      return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
+      return { queuedFinal: false, counts: { ...EMPTY_REPLY_COUNTS } };
     });
     loadConfig.mockReturnValue({
       channels: {
@@ -1825,9 +1829,8 @@ describe("createTelegramBot", () => {
     await handler(makeForumGroupMessageCtx({ threadId: 99 }));
 
     const payload = dispatchCall?.ctx;
-    expect(payload).toBeDefined();
     if (!payload) {
-      return;
+      throw new Error("Expected topic dispatch payload");
     }
     expect(payload.GroupSystemPrompt).toBe("Group prompt\n\nTopic prompt");
     expect(dispatchCall?.replyOptions?.skillFilter).toEqual([]);
