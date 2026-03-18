@@ -107,6 +107,24 @@ async function handleFileConsentInvoke(
           attachments: [fileInfoCard],
         });
 
+        // Replace the original FileConsentCard with the file info card so the
+        // consent prompt no longer shows as pending in the chat
+        if (pendingFile.consentCardActivityId) {
+          try {
+            await context.updateActivity({
+              id: pendingFile.consentCardActivityId,
+              type: "message",
+              attachments: [fileInfoCard],
+            });
+          } catch (updateErr) {
+            // Non-fatal: the upload succeeded; just log if Teams rejects the update
+            log.debug?.("failed to update consent card activity", {
+              uploadId,
+              error: String(updateErr),
+            });
+          }
+        }
+
         log.info("file upload complete", {
           uploadId,
           filename: consentResponse.uploadInfo.name,
