@@ -679,16 +679,28 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
 
   config = applyPrimaryModel(config, modelRef);
   if (isAzure) {
-    config = {
-      ...config,
-      agents: {
-        ...config.agents,
-        defaults: {
-          ...config.agents?.defaults,
-          thinkingDefault: config.agents?.defaults?.thinkingDefault ?? "medium",
+    const existingPerModelThinking = config.agents?.defaults?.models?.[modelRef]?.params?.thinking;
+    if (!existingPerModelThinking) {
+      config = {
+        ...config,
+        agents: {
+          ...config.agents,
+          defaults: {
+            ...config.agents?.defaults,
+            models: {
+              ...config.agents?.defaults?.models,
+              [modelRef]: {
+                ...config.agents?.defaults?.models?.[modelRef],
+                params: {
+                  ...config.agents?.defaults?.models?.[modelRef]?.params,
+                  thinking: "medium",
+                },
+              },
+            },
+          },
         },
-      },
-    };
+      };
+    }
   }
   if (alias) {
     config = {
