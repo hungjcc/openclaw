@@ -78,7 +78,9 @@ export function monitorMSTeamsProvider(opts: MonitorMSTeamsOpts): Promise<Monito
   if (activeInstancePromise) {
     const core = getMSTeamsRuntime();
     const log = core.logging.getChildLogger({ name: "msteams" });
-    log.warn?.("msteams provider already started; returning existing instance");
+    log.warn?.(
+      "msteams provider already started; returning existing instance — incoming abortSignal ignored",
+    );
     return activeInstancePromise;
   }
   activeInstancePromise = _startMSTeamsProvider(opts);
