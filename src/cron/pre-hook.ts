@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { platform } from "node:os";
 
 export type PreHookConfig = {
   command: string;
@@ -22,10 +23,14 @@ export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> 
       MAX_PRE_HOOK_TIMEOUT_SECONDS,
     ) * 1000;
 
+  const isWindows = platform() === "win32";
+  const shell = isWindows ? "cmd.exe" : "/bin/sh";
+  const shellArgs = isWindows ? ["/c", config.command] : ["-c", config.command];
+
   return new Promise<PreHookResult>((resolve) => {
     execFile(
-      "/bin/sh",
-      ["-c", config.command],
+      shell,
+      shellArgs,
       { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES },
       (error, stdout, stderr) => {
         if (!error) {

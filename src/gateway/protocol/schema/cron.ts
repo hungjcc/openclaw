@@ -315,13 +315,16 @@ export const CronJobPatchSchema = Type.Object(
     delivery: Type.Optional(CronDeliveryPatchSchema),
     failureAlert: Type.Optional(Type.Union([Type.Literal(false), CronFailureAlertSchema])),
     preHook: Type.Optional(
-      Type.Object(
-        {
-          command: NonEmptyString,
-          timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1, maximum: 300 })),
-        },
-        { additionalProperties: false },
-      ),
+      Type.Union([
+        Type.Object(
+          {
+            command: NonEmptyString,
+            timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1, maximum: 300 })),
+          },
+          { additionalProperties: false },
+        ),
+        Type.Null(),
+      ]),
     ),
     state: Type.Optional(Type.Partial(CronJobStateSchema)),
   },
