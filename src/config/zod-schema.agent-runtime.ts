@@ -604,7 +604,9 @@ export const MemorySearchSchema = z
       })
       .strict()
       .optional(),
-    provider: z.string().optional(),
+    provider: z
+      .enum(["openai", "local", "gemini", "voyage", "mistral", "ollama", "auto"])
+      .optional(),
     remote: z
       .object({
         baseUrl: z.string().optional(),
@@ -623,7 +625,9 @@ export const MemorySearchSchema = z
       })
       .strict()
       .optional(),
-    fallback: z.string().optional(),
+    fallback: z
+      .enum(["openai", "local", "gemini", "voyage", "mistral", "ollama", "none"])
+      .optional(),
     model: z.string().optional(),
     outputDimensionality: z.number().int().positive().optional(),
     local: z

@@ -5,7 +5,7 @@ export type CapabilityFilter<T extends string> = (cap: string) => cap is T;
 
 export type PluginProviderEntry = {
   id: string;
-  capabilities?: string[];
+  routingCapabilities?: string[];
   [key: string]: unknown;
 };
 
@@ -24,7 +24,7 @@ export function getPluginProvidersByCapability<T extends { id: string }>(
   for (const entry of registry.providers) {
     const p = entry.provider;
     // Guard against object-shaped capabilities (e.g., { providerFamily: "openai" })
-    const caps = p.capabilities;
+    const caps = p.routingCapabilities;
     const capabilitiesArray = Array.isArray(caps) ? caps : [];
     const hasCapability = capabilitiesArray.some(capabilityFilter) ?? false;
     if (!hasCapability) {

@@ -659,7 +659,8 @@ export type ProviderPlugin = {
   id: string;
   pluginId?: string;
   label: string;
-  capabilities?: ProviderCapability[];
+  /** Routing capabilities for media/embedding/TTS discovery (distinct from runtime provider capabilities) */
+  routingCapabilities?: ProviderCapability[];
   docsPath?: string;
   aliases?: string[];
   /**
