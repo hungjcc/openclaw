@@ -21,7 +21,10 @@ import type { PluginRuntime } from "../plugins/runtime/types.js";
 import { DEFAULT_ACCOUNT_ID } from "../routing/session-key.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createChannelManager } from "./server-channels.js";
-import { resolveChannelLifecyclePluginRuntimeState } from "./server-plugin-runtime-state.js";
+import {
+  ChannelLifecyclePluginRuntimeState,
+  resolveChannelLifecyclePluginRuntimeState,
+} from "./server-plugin-runtime-state.js";
 
 const hoisted = vi.hoisted(() => {
   const computeBackoff = vi.fn(() => 10);
@@ -497,5 +500,56 @@ describe("server-channels auto restart", () => {
     expect(getActivePluginRegistry()).toBe(bootstrappedRegistry);
     expect(getActivePluginRegistryKey()).toBe("bootstrapped-registry");
     expect(getGlobalPluginRegistry()).toBe(bootstrappedRegistry);
+  });
+
+  it("promotes live channel runtime state when the active registry changes but channel IDs stay the same", async () => {
+    const startupStartAccount = vi.fn(async () => {});
+    const upgradedStartAccount = vi.fn(async () => {
+      registerPluginHttpRoute({
+        path: "/upgraded-webhook",
+        auth: "plugin",
+        pluginId: "discord",
+        source: "test-webhook",
+        handler: () => true,
+      });
+    });
+    const startupRegistry = createTestRegistry(
+      createTestPlugin({
+        startAccount: startupStartAccount,
+      }),
+    );
+    const upgradedRegistry = createTestRegistry(
+      createTestPlugin({
+        startAccount: upgradedStartAccount,
+      }),
+    );
+
+    setActivePluginRegistry(startupRegistry, "startup-registry");
+    initializeGlobalHookRunner(startupRegistry);
+    let runtimeState: ChannelLifecyclePluginRuntimeState = {
+      registry: startupRegistry,
+      cacheKey: "startup-registry",
+    };
+    const manager = createManager({
+      resolvePluginRuntimeState: () => {
+        runtimeState = resolveChannelLifecyclePluginRuntimeState(runtimeState);
+        return runtimeState;
+      },
+    });
+
+    // Simulate an upgrade that activates a new registry with same channel IDs.
+    setActivePluginRegistry(upgradedRegistry, "upgraded-registry");
+    initializeGlobalHookRunner(upgradedRegistry);
+
+    await manager.startChannel("discord", DEFAULT_ACCOUNT_ID);
+
+    expect(upgradedStartAccount).toHaveBeenCalledTimes(1);
+    expect(startupStartAccount).not.toHaveBeenCalled();
+    expect(upgradedRegistry.httpRoutes).toHaveLength(1);
+    expect(upgradedRegistry.httpRoutes[0]?.path).toBe("/upgraded-webhook");
+    expect(startupRegistry.httpRoutes).toHaveLength(0);
+    expect(getActivePluginRegistry()).toBe(upgradedRegistry);
+    expect(getActivePluginRegistryKey()).toBe("upgraded-registry");
+    expect(getGlobalPluginRegistry()).toBe(upgradedRegistry);
   });
 });
