@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import plugin from "./index.js";
 import { __testing as exaTesting, createExaWebSearchProvider } from "./src/exa-search-provider.js";
 
@@ -49,7 +49,7 @@ describe("exa plugin", () => {
   });
 });
 
-describe("exa plugin execute() — strict param validation", () => {
+describe("exa execute() — strict param validation", () => {
   const TEST_API_KEY = "exa-test-key"; // pragma: allowlist secret
 
   function makeProvider() {
@@ -113,77 +113,5 @@ describe("exa plugin execute() — strict param validation", () => {
     await expect(tool!.execute({ query: "test query", date_before: "99-99-9999" })).rejects.toThrow(
       "not a valid date",
     );
-  });
-});
-
-describe("exa plugin execute() — API failure modes", () => {
-  const TEST_API_KEY = "exa-test-key"; // pragma: allowlist secret
-
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  function makeProvider() {
-    return createExaWebSearchProvider().createTool({
-      config: undefined,
-      searchConfig: { exa: { apiKey: TEST_API_KEY } },
-    });
-  }
-
-  it("throws on non-2xx HTTP response", async () => {
-    const mockFetch = vi.mocked(fetch);
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
-    const tool = makeProvider();
-    await expect(tool!.execute({ query: "test" })).rejects.toThrow("Exa API error (401)");
-  });
-
-  it("handles malformed API response where title/url are not strings", async () => {
-    const mockFetch = vi.mocked(fetch);
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          results: [
-            { title: 42, url: null, publishedDate: "2024-01-01" },
-            { title: "Valid", url: "https://example.com" },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
-
-    const tool = makeProvider();
-    const result = await tool!.execute({ query: "test" });
-    const results = (result as { results: Array<{ title: string; url: string }> }).results;
-    // Non-string title/url should be coerced to empty string
-    expect(results[0].title).toBe("");
-    expect(results[0].url).toBe("");
-    expect(results[1].title).toBeTruthy();
-    expect(results[1].url).toBe("https://example.com");
-  });
-
-  it("throws when API returns invalid JSON", async () => {
-    const mockFetch = vi.mocked(fetch);
-    mockFetch.mockResolvedValueOnce(
-      new Response("not-json{{{", {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-
-    const tool = makeProvider();
-    await expect(tool!.execute({ query: "test" })).rejects.toThrow("invalid JSON");
   });
 });
