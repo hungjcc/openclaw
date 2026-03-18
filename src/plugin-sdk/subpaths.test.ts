@@ -112,6 +112,12 @@ describe("plugin-sdk subpath exports", () => {
     expect(typeof runtimeSdk.createLoggerBackedRuntime).toBe("function");
   });
 
+  it("exports shared lazy runtime helpers from the dedicated subpath", () => {
+    expect(typeof lazyRuntimeSdk.createLazyRuntimeSurface).toBe("function");
+    expect(typeof lazyRuntimeSdk.createLazyRuntimeModule).toBe("function");
+    expect(typeof lazyRuntimeSdk.createLazyRuntimeNamedExport).toBe("function");
+  });
+
   it("exports provider setup helpers from the dedicated subpath", () => {
     expect(typeof providerSetupSdk.buildVllmProvider).toBe("function");
     expect(typeof providerSetupSdk.discoverOpenAICompatibleSelfHostedProvider).toBe("function");
