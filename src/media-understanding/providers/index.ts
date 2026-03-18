@@ -2,10 +2,9 @@ import { normalizeProviderId } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import { getActivePluginRegistry } from "../../plugins/runtime.js";
-import type { MediaUnderstandingProvider } from "../types.js";
 import { getPluginProvidersByCapability, type PluginProviderEntry } from "../../plugins/runtime.js";
+import type { MediaUnderstandingProvider } from "../types.js";
 import type { MediaUnderstandingCapability } from "../types.js";
-import { anthropicProvider } from "./anthropic/index.js";
 import { deepgramProvider } from "./deepgram/index.js";
 import { groqProvider } from "./groq/index.js";
 
@@ -53,10 +52,10 @@ function getPluginMediaProviders(): Record<string, MediaUnderstandingProvider> {
     (cap): cap is MediaUnderstandingCapability =>
       cap === "audio" || cap === "image" || cap === "video",
     (p: PluginProviderEntry) => {
-      if (!p.capabilities) {
+      if (!p.routingCapabilities) {
         return undefined;
       }
-      const capabilities = p.capabilities
+      const capabilities = p.routingCapabilities
         .map(mapMediaCapability)
         .filter((c): c is MediaUnderstandingCapability => c !== undefined);
       const hasMediaCapabilities = capabilities.length > 0;
