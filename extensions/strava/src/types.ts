@@ -4,7 +4,8 @@ export interface StravaTokens {
   refreshToken: string;
   /** Unix epoch (seconds) when accessToken expires. */
   expiresAt: number;
-  athleteId: number;
+  /** String to avoid JS number precision loss on 64-bit Strava IDs. */
+  athleteId: string;
 }
 
 /** Plugin config provided by the deployer. */
@@ -15,7 +16,8 @@ export interface StravaConfig {
 
 /** Summary activity returned by GET /athlete/activities. */
 export interface StravaActivity {
-  id: number;
+  /** String to avoid JS number precision loss on 64-bit Strava IDs. */
+  id: string;
   name: string;
   sport_type: string;
   distance: number;

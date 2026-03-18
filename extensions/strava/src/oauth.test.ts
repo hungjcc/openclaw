@@ -49,7 +49,7 @@ describe("TokenStore", () => {
     accessToken: "access_123",
     refreshToken: "refresh_456",
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
-    athleteId: 42,
+    athleteId: "42",
   };
 
   beforeEach(() => {

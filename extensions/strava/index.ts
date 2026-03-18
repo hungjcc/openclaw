@@ -97,6 +97,20 @@ const stravaPlugin = {
             return;
           }
 
+          // Strava returns the granted scopes — reject if the user declined activity access.
+          const grantedScope = url.searchParams.get("scope") ?? "";
+          if (!grantedScope.includes("activity:read")) {
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "text/html");
+            res.end(
+              htmlPage(
+                "Insufficient Permissions",
+                "The activity read permission is required. Please try connecting again and grant activity access.",
+              ),
+            );
+            return;
+          }
+
           const tokens = await exchangeCode(config, code);
           tokenStore.save(tokens);
 

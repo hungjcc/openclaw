@@ -58,7 +58,7 @@ export async function exchangeCode(config: StravaConfig, code: string): Promise<
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
-    athleteId: data.athlete.id,
+    athleteId: String(data.athlete.id),
   };
 }
 
@@ -101,7 +101,7 @@ export async function refreshTokens(
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: data.expires_at,
-    athleteId: 0, // caller must merge with existing athleteId
+    athleteId: "", // caller must merge with existing athleteId
   };
 }
 

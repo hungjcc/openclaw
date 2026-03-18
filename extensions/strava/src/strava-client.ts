@@ -79,7 +79,7 @@ export async function getActivities(
 /** Get full details for a single activity. */
 export async function getActivity(
   token: string,
-  activityId: number,
+  activityId: string,
 ): Promise<StravaActivityDetail> {
   return stravaFetch<StravaActivityDetail>(token, `/activities/${activityId}`);
 }
@@ -98,7 +98,7 @@ export async function verifyToken(token: string): Promise<boolean> {
 /** Get aggregated stats for an athlete. */
 export async function getAthleteStats(
   token: string,
-  athleteId: number,
+  athleteId: string,
 ): Promise<StravaAthleteStats> {
   return stravaFetch<StravaAthleteStats>(token, `/athletes/${athleteId}/stats`);
 }

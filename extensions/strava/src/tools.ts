@@ -202,13 +202,13 @@ function createActivityDetailTool(deps: ToolDeps) {
     description:
       "Get full details for a specific Strava activity including per-km splits, laps, heart rate, calories, and gear. Use the activity ID from strava_activities.",
     parameters: Type.Object({
-      activityId: Type.Number({ description: "The Strava activity ID." }),
+      activityId: Type.String({ description: "The Strava activity ID (from strava_activities)." }),
     }),
     execute: withRevocationGuard(deps, async (_id: string, params: Record<string, unknown>) => {
       const token = await getTokenOrNull(deps);
       if (!token) return notConnectedResult(deps);
 
-      const activityId = params.activityId as number;
+      const activityId = params.activityId as string;
       const detail = await client.getActivity(token, activityId);
 
       const splits = (detail.splits_metric ?? []).map((s) => ({

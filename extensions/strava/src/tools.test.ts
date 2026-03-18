@@ -60,7 +60,7 @@ describe("createStravaTools", () => {
   it("activity_detail returns not-connected when no tokens", async () => {
     const tools = createStravaTools({ config, tokenStore, getRedirectUri });
     const detailTool = tools.find((t) => t.name === "strava_activity_detail")!;
-    const result = await detailTool.execute("test-id", { activityId: 123 });
+    const result = await detailTool.execute("test-id", { activityId: "123" });
     const data = JSON.parse(result.content[0].text);
     expect(data.connected).toBe(false);
   });
@@ -96,7 +96,7 @@ describe("getTokenOrNull error handling", () => {
       accessToken: "old",
       refreshToken: "old-refresh",
       expiresAt: 0, // expired
-      athleteId: 1,
+      athleteId: "1",
     });
 
     // Mock fetch to return 401
@@ -119,7 +119,7 @@ describe("getTokenOrNull error handling", () => {
       accessToken: "old",
       refreshToken: "old-refresh",
       expiresAt: 0, // expired
-      athleteId: 1,
+      athleteId: "1",
     });
 
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
