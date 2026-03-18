@@ -2336,7 +2336,7 @@ Notes:
 
 - Declare which capabilities your provider supports in the `capabilities` array.
 - Implement only the methods for capabilities you support.
-- Providers are tried in this order: user's configured provider → other plugin providers → built-in providers.
+- Providers are tried in this order: user's configured provider → built-in providers → other plugin providers.
 - For TTS, return `sampleRate` in the result if your provider will be used for telephony (voice calls).
 - The `apiKey`, `baseUrl`, and other fields come from the user's `tools.media.*` config.
 - For custom providers (not openai/elevenlabs), `apiKey` may be empty — plugins should get credentials from environment variables or their own configuration.

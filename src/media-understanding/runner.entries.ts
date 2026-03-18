@@ -15,6 +15,7 @@ import type {
 import { logVerbose, shouldLogVerbose } from "../globals.js";
 import { resolveProxyFetchFromEnv } from "../infra/net/proxy-fetch.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
+import { getActivePluginRegistry } from "../plugins/runtime.js";
 import { runExec } from "../process/exec.js";
 import { MediaAttachmentCache } from "./attachments.js";
 import {
@@ -448,7 +449,6 @@ export async function runProviderEntry(params: {
   // Check if this is a plugin provider by checking the active plugin registry
   // Use normalizeMediaProviderId for consistency with the media registry keys
   // This is computed once and used for all capability types (image, audio, video)
-  const { getActivePluginRegistry } = await import("../plugins/runtime.js");
   const pluginRegistry = getActivePluginRegistry();
   const isPluginProvider =
     pluginRegistry?.providers.some(

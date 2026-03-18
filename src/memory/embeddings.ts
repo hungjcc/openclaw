@@ -247,13 +247,18 @@ function getPluginEmbeddingProvidersSync(
         ...options.remote?.headers,
       };
 
-      // Helper to resolve API key from config or auth sources
+      // Helper to resolve API key from config or auth sources (cached per provider)
+      let cachedApiKey: string | null = null;
       const resolveApiKey = async (): Promise<string> => {
+        if (cachedApiKey !== null) {
+          return cachedApiKey;
+        }
         const resolvedApiKey = resolveMemorySecretInputString({
           value: options.remote?.apiKey,
           path: "agents.*.memorySearch.remote.apiKey",
         });
         if (resolvedApiKey) {
+          cachedApiKey = resolvedApiKey;
           return resolvedApiKey;
         }
         // Try to resolve from auth sources - but allow keyless plugins to proceed
@@ -264,14 +269,18 @@ function getPluginEmbeddingProvidersSync(
             agentDir: options.agentDir,
           });
           if (!auth) {
+            cachedApiKey = "";
             return "";
           }
           if (typeof auth === "string") {
+            cachedApiKey = auth;
             return auth;
           }
-          return auth.apiKey ?? "";
+          cachedApiKey = auth.apiKey ?? "";
+          return cachedApiKey;
         } catch {
           // No API key found - let the plugin decide what to do (may be keyless)
+          cachedApiKey = "";
           return "";
         }
       };
