@@ -94,6 +94,15 @@ function linkPluginNodeModules(params) {
   if (!fs.existsSync(params.sourcePluginNodeModulesDir)) {
     return;
   }
+  // Guard against dangling symlinks that existsSync/rmSync may have missed
+  // (e.g. Docker layer cache restoring a symlink whose target no longer exists).
+  // lstatSync does not follow symlinks, so it detects the entry even when dangling.
+  try {
+    fs.lstatSync(runtimeNodeModulesDir);
+    fs.rmSync(runtimeNodeModulesDir, { recursive: true, force: true });
+  } catch {
+    // Path does not exist — safe to proceed.
+  }
   fs.symlinkSync(params.sourcePluginNodeModulesDir, runtimeNodeModulesDir, symlinkType());
 
   // Runtime wrappers re-export from dist/extensions/<plugin>/index.js, so Node
