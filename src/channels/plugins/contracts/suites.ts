@@ -32,6 +32,30 @@ function sortStrings(values: readonly string[]) {
   return [...values].toSorted((left, right) => left.localeCompare(right));
 }
 
+function resolveContractMessageDiscovery(params: {
+  plugin: Pick<ChannelPlugin, "actions">;
+  cfg: OpenClawConfig;
+}) {
+  const actions = params.plugin.actions;
+  if (!actions) {
+    return {
+      actions: [] as ChannelMessageActionName[],
+      capabilities: [] as readonly ChannelMessageCapability[],
+    };
+  }
+  if (actions.describeMessageTool) {
+    const discovery = actions.describeMessageTool({ cfg: params.cfg }) ?? null;
+    return {
+      actions: Array.isArray(discovery?.actions) ? [...discovery.actions] : [],
+      capabilities: Array.isArray(discovery?.capabilities) ? discovery.capabilities : [],
+    };
+  }
+  return {
+    actions: actions.listActions?.({ cfg: params.cfg }) ?? [],
+    capabilities: actions.getCapabilities?.({ cfg: params.cfg }) ?? [],
+  };
+}
+
 const contractRuntime = createNonExitingRuntime();
 function expectDirectoryEntryShape(entry: ChannelDirectoryEntry) {
   expect(["user", "group", "channel"]).toContain(entry.kind);
@@ -131,23 +155,6 @@ function hasActionsDiscoverySurface(actions: ChannelPlugin["actions"] | undefine
   );
 }
 
-function resolveActionsDiscovery(params: {
-  actions: ChannelPlugin["actions"] | undefined;
-  cfg: OpenClawConfig;
-}): { actions: ChannelMessageActionName[]; capabilities: readonly ChannelMessageCapability[] } {
-  const described = params.actions?.describeMessageTool?.({ cfg: params.cfg });
-  if (described) {
-    return {
-      actions: described.actions ? [...described.actions] : [],
-      capabilities: described.capabilities ?? [],
-    };
-  }
-  return {
-    actions: params.actions?.listActions?.({ cfg: params.cfg }) ?? [],
-    capabilities: params.actions?.getCapabilities?.({ cfg: params.cfg }) ?? [],
-  };
-}
-
 export function installChannelActionsContractSuite(params: {
   plugin: Pick<ChannelPlugin, "id" | "actions">;
   cases: readonly ChannelActionsContractCase[];
@@ -162,10 +169,12 @@ export function installChannelActionsContractSuite(params: {
     it(`actions contract: ${testCase.name}`, () => {
       testCase.beforeTest?.();
 
-      const { actions, capabilities } = resolveActionsDiscovery({
-        actions: params.plugin.actions,
+      const discovery = resolveContractMessageDiscovery({
+        plugin: params.plugin,
         cfg: testCase.cfg,
       });
+      const actions = discovery.actions;
+      const capabilities = discovery.capabilities;
 
       expect(actions).toEqual([...new Set(actions)]);
       expect(capabilities).toEqual([...new Set(capabilities)]);
