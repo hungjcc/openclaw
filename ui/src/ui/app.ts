@@ -165,6 +165,9 @@ export class OpenClawApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
+  @state() chatHistoryCursor: string | null = null;
+  @state() chatHistoryHasMore = false;
+  @state() chatHistoryRenderOffset = 0;
   @state() navDrawerOpen = false;
 
   onSlashAction?: (action: string) => void;

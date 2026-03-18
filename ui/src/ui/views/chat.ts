@@ -109,6 +109,11 @@ export type ChatProps = {
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
   basePath?: string;
+  // Pagination
+  historyCursor?: string | null;
+  historyHasMore?: boolean;
+  historyRenderOffset?: number;
+  onLoadMoreHistory?: () => void;
 };
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
@@ -895,6 +900,21 @@ export function renderChat(props: ChatProps) {
       }
       ${isEmpty && !vs.searchOpen ? renderWelcomeState(props) : nothing}
       ${
+        props.historyHasMore && !props.loading
+          ? html`
+              <div class="chat-load-more">
+                <button
+                  class="chat-load-more__btn"
+                  @click=${props.onLoadMoreHistory}
+                  ?disabled=${props.loading || props.sending}
+                >
+                  Load earlier messages
+                </button>
+              </div>
+            `
+          : nothing
+      }
+      ${
         isEmpty && vs.searchOpen
           ? html`
               <div class="agent-chat__empty">No matching messages</div>
@@ -1328,7 +1348,7 @@ export function renderChat(props: ChatProps) {
   `;
 }
 
-const CHAT_HISTORY_RENDER_LIMIT = 200;
+const CHAT_HISTORY_RENDER_LIMIT = 2000;
 
 function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   const result: Array<ChatItem | MessageGroup> = [];
@@ -1381,14 +1401,17 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
   const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
-  const historyStart = Math.max(0, history.length - CHAT_HISTORY_RENDER_LIMIT);
+  const renderOffset =
+    typeof props.historyRenderOffset === "number" ? props.historyRenderOffset : 0;
+  const effectiveLimit = CHAT_HISTORY_RENDER_LIMIT + renderOffset;
+  const historyStart = Math.max(0, history.length - effectiveLimit);
   if (historyStart > 0) {
     items.push({
       kind: "message",
       key: "chat:history:notice",
       message: {
         role: "system",
-        content: `Showing last ${CHAT_HISTORY_RENDER_LIMIT} messages (${historyStart} hidden).`,
+        content: `Showing last ${effectiveLimit} messages (${historyStart} hidden).`,
         timestamp: Date.now(),
       },
     });
