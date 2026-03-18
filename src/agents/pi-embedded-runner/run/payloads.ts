@@ -48,6 +48,28 @@ function isRecoverableToolError(error: string | undefined): boolean {
   return RECOVERABLE_TOOL_ERROR_KEYWORDS.some((keyword) => errorLower.includes(keyword));
 }
 
+const FAILURE_REASON_MAX_LENGTH = 120;
+
+/**
+ * Truncate a tool error reason to a short suffix suitable for the chat warning.
+ * Takes the first non-empty line and caps at {@link FAILURE_REASON_MAX_LENGTH} chars.
+ */
+function truncateErrorReason(error: string): string {
+  const firstLine =
+    error
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+  // Strip internal tool-context prefixes (e.g. "agent=… node=… gateway=… action=…: ")
+  // to avoid leaking implementation details into user-facing warnings (#46592).
+  const cleaned = firstLine.replace(/^(?:\w+=\S+\s+)*\w+=\S+:\s*/, "");
+  const line = cleaned || firstLine;
+  if (line.length <= FAILURE_REASON_MAX_LENGTH) {
+    return line;
+  }
+  return line.slice(0, FAILURE_REASON_MAX_LENGTH) + "…";
+}
+
 function isVerboseToolDetailEnabled(level?: VerboseLevel): boolean {
   return level === "on" || level === "full";
 }
@@ -299,10 +321,11 @@ export function buildEmbeddedRunPayloads(params: {
         params.lastToolError.meta ? [params.lastToolError.meta] : undefined,
         { markdown: useMarkdown },
       );
-      const errorSuffix =
-        warningPolicy.includeDetails && params.lastToolError.error
+      const errorSuffix = params.lastToolError.error
+        ? warningPolicy.includeDetails
           ? `: ${params.lastToolError.error}`
-          : "";
+          : ` — ${truncateErrorReason(params.lastToolError.error)}`
+        : "";
       const warningText = `⚠️ ${toolSummary} failed${errorSuffix}`;
       const normalizedWarning = normalizeTextForComparison(warningText);
       const duplicateWarning = normalizedWarning
