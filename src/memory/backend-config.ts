@@ -109,8 +109,12 @@ function sanitizeName(input: string): string {
   return trimmed || "collection";
 }
 
-function scopeCollectionBase(base: string, agentId: string): string {
-  return `${base}-${sanitizeName(agentId)}`;
+function scopeCollectionBase(base: string, agentId: string, userId?: string): string {
+  const sanitized = sanitizeName(agentId);
+  if (userId) {
+    return `${base}-${sanitized}-${sanitizeName(userId)}`;
+  }
+  return `${base}-${sanitized}`;
 }
 
 function ensureUniqueName(base: string, existing: Set<string>): string {
@@ -277,26 +281,54 @@ function resolveDefaultCollections(
   workspaceDir: string,
   existing: Set<string>,
   agentId: string,
+  userId?: string,
 ): ResolvedQmdCollection[] {
   if (!include) {
     return [];
   }
-  const entries: Array<{ path: string; pattern: string; base: string }> = [
-    { path: workspaceDir, pattern: "MEMORY.md", base: "memory-root" },
-    { path: workspaceDir, pattern: "memory.md", base: "memory-alt" },
-    { path: path.join(workspaceDir, "memory"), pattern: "**/*.md", base: "memory-dir" },
-  ];
-  return entries.map((entry) => ({
-    name: ensureUniqueName(scopeCollectionBase(entry.base, agentId), existing),
-    path: entry.path,
-    pattern: entry.pattern,
+
+  const collections: ResolvedQmdCollection[] = [];
+
+  // Shared root files (always included regardless of isolation, agent-scoped only)
+  collections.push({
+    name: ensureUniqueName(scopeCollectionBase("memory-root", agentId), existing),
+    path: workspaceDir,
+    pattern: "MEMORY.md",
     kind: "memory",
-  }));
+  });
+  collections.push({
+    name: ensureUniqueName(scopeCollectionBase("memory-alt", agentId), existing),
+    path: workspaceDir,
+    pattern: "memory.md",
+    kind: "memory",
+  });
+
+  if (userId) {
+    // Isolation enabled: only user-specific directory
+    const userMemoryDir = path.join(workspaceDir, "memory", userId);
+    collections.push({
+      name: ensureUniqueName(scopeCollectionBase(`memory-${userId}`, agentId, userId), existing),
+      path: userMemoryDir,
+      pattern: "**/*.md",
+      kind: "memory",
+    });
+  } else {
+    // No isolation: entire memory directory
+    collections.push({
+      name: ensureUniqueName(scopeCollectionBase("memory-dir", agentId), existing),
+      path: path.join(workspaceDir, "memory"),
+      pattern: "**/*.md",
+      kind: "memory",
+    });
+  }
+
+  return collections;
 }
 
 export function resolveMemoryBackendConfig(params: {
   cfg: OpenClawConfig;
   agentId: string;
+  userId?: string;
 }): ResolvedMemoryBackendConfig {
   const backend = params.cfg.memory?.backend ?? DEFAULT_BACKEND;
   const citations = params.cfg.memory?.citations ?? DEFAULT_CITATIONS;
@@ -309,7 +341,13 @@ export function resolveMemoryBackendConfig(params: {
   const includeDefaultMemory = qmdCfg?.includeDefaultMemory !== false;
   const nameSet = new Set<string>();
   const collections = [
-    ...resolveDefaultCollections(includeDefaultMemory, workspaceDir, nameSet, params.agentId),
+    ...resolveDefaultCollections(
+      includeDefaultMemory,
+      workspaceDir,
+      nameSet,
+      params.agentId,
+      params.userId,
+    ),
     ...resolveCustomPaths(qmdCfg?.paths, workspaceDir, nameSet, params.agentId),
   ];
 

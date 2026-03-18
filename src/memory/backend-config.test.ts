@@ -143,4 +143,47 @@ describe("resolveMemoryBackendConfig", () => {
     const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
     expect(resolved.qmd?.searchMode).toBe("vsearch");
   });
+
+  it("scopes qmd collections by user when userId provided", () => {
+    const cfg = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {},
+      },
+    } as OpenClawConfig;
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main", userId: "user-abc" });
+    expect(resolved.backend).toBe("qmd");
+    const names = new Set((resolved.qmd?.collections ?? []).map((c) => c.name));
+    // Shared root files should still be agent-scoped (not user-scoped)
+    expect(names.has("memory-root-main")).toBe(true);
+    expect(names.has("memory-alt-main")).toBe(true);
+    // User-scoped memory directory should include userId
+    expect(names.has("memory-user-abc-main-user-abc")).toBe(true);
+    // Agent-wide memory-dir should NOT be present when userId is provided
+    expect(names.has("memory-dir-main")).toBe(false);
+    // Verify the user-scoped collection path points to user-specific directory
+    const userCollection = resolved.qmd?.collections.find(
+      (c) => c.name === "memory-user-abc-main-user-abc",
+    );
+    expect(userCollection?.path).toBe(path.join("/tmp/memory-test", "memory", "user-abc"));
+    expect(userCollection?.pattern).toBe("**/*.md");
+    expect(userCollection?.kind).toBe("memory");
+  });
+
+  it("includes agent-wide memory directory when userId not provided", () => {
+    const cfg = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {},
+      },
+    } as OpenClawConfig;
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    const names = new Set((resolved.qmd?.collections ?? []).map((c) => c.name));
+    // Should include agent-wide memory-dir
+    expect(names.has("memory-dir-main")).toBe(true);
+    const dirCollection = resolved.qmd?.collections.find((c) => c.name === "memory-dir-main");
+    expect(dirCollection?.path).toBe(path.join("/tmp/memory-test", "memory"));
+  });
 });

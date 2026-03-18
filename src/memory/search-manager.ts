@@ -33,7 +33,7 @@ export async function getMemorySearchManager(params: {
     const statusOnly = params.purpose === "status";
     let cacheKey: string | undefined;
     if (!statusOnly) {
-      cacheKey = buildQmdCacheKey(params.agentId, resolved.qmd);
+      cacheKey = buildQmdCacheKey(params.agentId, resolved.qmd, params.userId);
       const cached = QMD_MANAGER_CACHE.get(cacheKey);
       if (cached) {
         return { manager: cached };
@@ -248,8 +248,10 @@ class FallbackMemoryManager implements MemorySearchManager {
   }
 }
 
-function buildQmdCacheKey(agentId: string, config: ResolvedQmdConfig): string {
+function buildQmdCacheKey(agentId: string, config: ResolvedQmdConfig, userId?: string): string {
   // ResolvedQmdConfig is assembled in a stable field order in resolveMemoryBackendConfig.
   // Fast stringify avoids deep key-sorting overhead on this hot path.
-  return `${agentId}:${JSON.stringify(config)}`;
+  // Include userId for cache isolation when memory isolation is enabled.
+  const userSuffix = userId ? `:${userId}` : "";
+  return `${agentId}:${JSON.stringify(config)}${userSuffix}`;
 }

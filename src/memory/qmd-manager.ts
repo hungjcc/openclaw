@@ -132,13 +132,19 @@ export class QmdMemoryManager implements MemorySearchManager {
     if (!resolved) {
       return null;
     }
-    const manager = new QmdMemoryManager({ cfg: params.cfg, agentId: params.agentId, resolved });
+    const manager = new QmdMemoryManager({
+      cfg: params.cfg,
+      agentId: params.agentId,
+      resolved,
+      userId: params.userId,
+    });
     await manager.initialize(params.mode ?? "full");
     return manager;
   }
 
   private readonly cfg: OpenClawConfig;
   private readonly agentId: string;
+  private readonly userId: string | undefined;
   private readonly qmd: ResolvedQmdConfig;
   private readonly workspaceDir: string;
   private readonly stateDir: string;
@@ -182,9 +188,11 @@ export class QmdMemoryManager implements MemorySearchManager {
     cfg: OpenClawConfig;
     agentId: string;
     resolved: ResolvedQmdConfig;
+    userId?: string;
   }) {
     this.cfg = params.cfg;
     this.agentId = params.agentId;
+    this.userId = params.userId;
     this.qmd = params.resolved;
     this.workspaceDir = resolveAgentWorkspaceDir(params.cfg, params.agentId);
     this.stateDir = resolveStateDir(process.env, os.homedir);
@@ -1465,7 +1473,9 @@ export class QmdMemoryManager implements MemorySearchManager {
 
   private pickSessionCollectionName(): string {
     const existing = new Set(this.qmd.collections.map((collection) => collection.name));
-    const base = `sessions-${this.sanitizeCollectionNameSegment(this.agentId)}`;
+    // Include userId in collection name for isolation when enabled
+    const userSuffix = this.userId ? `-${this.sanitizeCollectionNameSegment(this.userId)}` : "";
+    const base = `sessions-${this.sanitizeCollectionNameSegment(this.agentId)}${userSuffix}`;
     if (!existing.has(base)) {
       return base;
     }
