@@ -73,7 +73,28 @@ function createMockSock(): MockSock {
 function getPairingStoreMocks() {
   const readChannelAllowFromStore = (...args: unknown[]) => readAllowFromStoreMock(...args);
   const upsertChannelPairingRequest = (...args: unknown[]) => upsertPairingRequestMock(...args);
+  const issuePairingChallenge = async (params: {
+    senderId: string;
+    senderIdLine: string;
+    upsertPairingRequest: (params: {
+      id: string;
+      meta?: Record<string, string | undefined>;
+    }) => Promise<{ code: string; created: boolean }>;
+    sendPairingReply: (text: string) => Promise<void>;
+    meta?: Record<string, string | undefined>;
+  }) => {
+    const { code, created } = await params.upsertPairingRequest({
+      id: params.senderId,
+      meta: params.meta,
+    });
+    if (!created) {
+      return { created: false };
+    }
+    await params.sendPairingReply(`${params.senderIdLine}\nPairing code: ${code}`);
+    return { created: true, code };
+  };
   return {
+    issuePairingChallenge,
     readChannelAllowFromStore,
     upsertChannelPairingRequest,
   };
@@ -99,6 +120,22 @@ vi.mock("openclaw/plugin-sdk/config-runtime", async (importOriginal) => {
   return {
     ...actual,
     loadConfig: () => mockLoadConfig(),
+  };
+});
+
+vi.mock("openclaw/plugin-sdk/security-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("openclaw/plugin-sdk/security-runtime")>();
+  return {
+    ...actual,
+    readStoreAllowFromForDmPolicy: async (params: {
+      dmPolicy?: string | null;
+      shouldRead?: boolean | null;
+    }) => {
+      if (params.shouldRead === false || params.dmPolicy === "allowlist") {
+        return [];
+      }
+      return await readAllowFromStoreMock("whatsapp", DEFAULT_ACCOUNT_ID);
+    },
   };
 });
 

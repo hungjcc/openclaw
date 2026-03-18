@@ -125,7 +125,7 @@ export function createLlmTaskTool(api: OpenClawPluginApi) {
       const thinkLevel = thinkingRaw ? normalizeThinkLevel(thinkingRaw) : undefined;
       if (thinkingRaw && !thinkLevel) {
         throw new Error(
-          `Invalid thinking level "${thinkingRaw}". Use one of: ${formatThinkingLevels(provider, model)}.`,
+          `Invalid thinking level "${thinkingRaw}". Use one of: ${formatThinkingLevels()}.`,
         );
       }
       if (thinkLevel === "xhigh" && !supportsXHighThinking(provider, model)) {

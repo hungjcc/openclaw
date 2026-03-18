@@ -103,3 +103,9 @@ export async function probeIMessage(
     await client.stop();
   }
 }
+
+export const __testing = {
+  resetRpcSupportCache() {
+    rpcSupportCache.clear();
+  },
+};

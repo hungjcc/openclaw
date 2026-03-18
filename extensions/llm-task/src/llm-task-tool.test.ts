@@ -1,4 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("../api.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api.js")>();
+  return {
+    ...actual,
+    supportsXHighThinking: vi.fn(() => false),
+  };
+});
+
 import { createLlmTaskTool } from "./llm-task-tool.js";
 
 const runEmbeddedPiAgent = vi.fn(async () => ({

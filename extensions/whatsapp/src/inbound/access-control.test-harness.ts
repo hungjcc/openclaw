@@ -41,7 +41,45 @@ vi.mock("openclaw/plugin-sdk/config-runtime", async (importOriginal) => {
   };
 });
 
+vi.mock("openclaw/plugin-sdk/security-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("openclaw/plugin-sdk/security-runtime")>();
+  return {
+    ...actual,
+    readStoreAllowFromForDmPolicy: async (params: {
+      provider: string;
+      accountId: string;
+      dmPolicy?: string | null;
+      shouldRead?: boolean | null;
+    }) => {
+      if (params.shouldRead === false || params.dmPolicy === "allowlist") {
+        return [];
+      }
+      return await readAllowFromStoreMock(params.provider, params.accountId);
+    },
+  };
+});
+
 vi.mock("openclaw/plugin-sdk/conversation-runtime", () => ({
+  issuePairingChallenge: async (params: {
+    senderId: string;
+    senderIdLine: string;
+    upsertPairingRequest: (params: {
+      id: string;
+      meta?: Record<string, string | undefined>;
+    }) => Promise<{ code: string; created: boolean }>;
+    sendPairingReply: (text: string) => Promise<void>;
+    meta?: Record<string, string | undefined>;
+  }) => {
+    const { code, created } = await params.upsertPairingRequest({
+      id: params.senderId,
+      meta: params.meta,
+    });
+    if (!created) {
+      return { created: false };
+    }
+    await params.sendPairingReply(`${params.senderIdLine}\nPairing code: ${code}`);
+    return { created: true, code };
+  },
   readChannelAllowFromStore: (...args: unknown[]) => readAllowFromStoreMock(...args),
   upsertChannelPairingRequest: (...args: unknown[]) => upsertPairingRequestMock(...args),
 }));

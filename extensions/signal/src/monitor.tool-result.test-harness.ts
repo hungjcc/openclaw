@@ -76,9 +76,13 @@ vi.mock("openclaw/plugin-sdk/config-runtime", async (importOriginal) => {
   };
 });
 
-vi.mock("openclaw/plugin-sdk/reply-runtime", () => ({
-  getReplyFromConfig: (...args: unknown[]) => replyMock(...args),
-}));
+vi.mock("openclaw/plugin-sdk/reply-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("openclaw/plugin-sdk/reply-runtime")>();
+  return {
+    ...actual,
+    getReplyFromConfig: (...args: unknown[]) => replyMock(...args),
+  };
+});
 
 vi.mock("./send.js", () => ({
   sendMessageSignal: (...args: unknown[]) => sendMock(...args),
@@ -86,10 +90,14 @@ vi.mock("./send.js", () => ({
   sendReadReceiptSignal: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("openclaw/plugin-sdk/conversation-runtime", () => ({
-  readChannelAllowFromStore: (...args: unknown[]) => readAllowFromStoreMock(...args),
-  upsertChannelPairingRequest: (...args: unknown[]) => upsertPairingRequestMock(...args),
-}));
+vi.mock("openclaw/plugin-sdk/conversation-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("openclaw/plugin-sdk/conversation-runtime")>();
+  return {
+    ...actual,
+    readChannelAllowFromStore: (...args: unknown[]) => readAllowFromStoreMock(...args),
+    upsertChannelPairingRequest: (...args: unknown[]) => upsertPairingRequestMock(...args),
+  };
+});
 
 vi.mock("openclaw/plugin-sdk/config-runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("openclaw/plugin-sdk/config-runtime")>();
@@ -116,9 +124,13 @@ vi.mock("./daemon.js", async (importOriginal) => {
   };
 });
 
-vi.mock("openclaw/plugin-sdk/infra-runtime", () => ({
-  waitForTransportReady: (...args: unknown[]) => waitForTransportReadyMock(...args),
-}));
+vi.mock("openclaw/plugin-sdk/infra-runtime", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("openclaw/plugin-sdk/infra-runtime")>();
+  return {
+    ...actual,
+    waitForTransportReady: (...args: unknown[]) => waitForTransportReadyMock(...args),
+  };
+});
 
 export function installSignalToolResultTestHooks() {
   beforeEach(() => {
