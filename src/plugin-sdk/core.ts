@@ -76,6 +76,7 @@ export { emptyPluginConfigSchema } from "../plugins/config-schema.js";
 export { delegateCompactionToRuntime } from "../context-engine/delegate.js";
 export { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 export { buildChannelConfigSchema } from "../channels/plugins/config-schema.js";
+export { MarkdownConfigSchema } from "../config/zod-schema.core.js";
 export {
   applyAccountNameToChannelSection,
   migrateBaseNameToDefaultAccount,
