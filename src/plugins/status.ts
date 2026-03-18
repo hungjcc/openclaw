@@ -84,6 +84,7 @@ export type PluginInspectReport = {
     hasAllowedModelsConfig: boolean;
   };
   usesLegacyBeforeAgentStart: boolean;
+  compatibility: PluginCompatibilityNotice[];
 };
 
 function buildCompatibilityNoticesForInspect(
