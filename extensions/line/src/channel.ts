@@ -30,17 +30,35 @@ type LineChannelDataWithMedia = LineChannelData & {
   trackingId?: string;
 };
 
+function isLineUserTarget(target: string): boolean {
+  const normalized = target
+    .trim()
+    .replace(/^line:(group|room|user):/i, "")
+    .replace(/^line:/i, "");
+  return /^U/i.test(normalized);
+}
+
 // Build a raw LINE API message object from a resolved outbound media result.
 // Used for the inline quick-reply batch path where raw message objects are required.
-function buildLineMediaMessageObject(resolved: LineOutboundMediaResolved): Record<string, unknown> {
+function buildLineMediaMessageObject(
+  resolved: LineOutboundMediaResolved,
+  opts?: { allowTrackingId?: boolean },
+): Record<string, unknown> {
   switch (resolved.mediaKind) {
-    case "video":
+    case "video": {
+      const previewImageUrl = resolved.previewImageUrl?.trim();
+      if (!previewImageUrl) {
+        throw new Error("LINE video messages require previewImageUrl to reference an image URL");
+      }
       return {
         type: "video",
         originalContentUrl: resolved.mediaUrl,
-        previewImageUrl: resolved.previewImageUrl ?? resolved.mediaUrl,
-        ...(resolved.trackingId ? { trackingId: resolved.trackingId } : {}),
+        previewImageUrl,
+        ...(opts?.allowTrackingId && resolved.trackingId
+          ? { trackingId: resolved.trackingId }
+          : {}),
       };
+    }
     case "audio":
       return {
         type: "audio",
@@ -353,7 +371,9 @@ export const linePlugin: ChannelPlugin<ResolvedLineAccount> = {
             durationMs: lineData.durationMs,
             trackingId: lineData.trackingId,
           });
-          quickReplyMessages.push(buildLineMediaMessageObject(resolved));
+          quickReplyMessages.push(
+            buildLineMediaMessageObject(resolved, { allowTrackingId: isLineUserTarget(to) }),
+          );
         }
         if (quickReplyMessages.length > 0 && quickReply) {
           const lastIndex = quickReplyMessages.length - 1;
