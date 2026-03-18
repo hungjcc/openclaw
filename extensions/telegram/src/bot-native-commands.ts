@@ -78,6 +78,7 @@ import { buildInlineKeyboard } from "./send.js";
 const EMPTY_RESPONSE_FALLBACK = "No response generated. Please try again.";
 
 type TelegramNativeCommandContext = Context & { match?: string };
+type TelegramNativeCommandMessage = NonNullable<TelegramNativeCommandContext["msg"]>;
 
 type TelegramCommandAuthResult = {
   chatId: number;
@@ -147,7 +148,7 @@ export type RegisterTelegramNativeCommandsParams = {
 };
 
 async function resolveTelegramCommandAuth(params: {
-  msg: NonNullable<TelegramNativeCommandContext["message"]>;
+  msg: TelegramNativeCommandMessage;
   bot: Bot;
   cfg: OpenClawConfig;
   accountId: string;
@@ -176,11 +177,14 @@ async function resolveTelegramCommandAuth(params: {
     requireAuth,
   } = params;
   const chatId = msg.chat.id;
+  const isChannelPost = msg.chat.type === "channel";
   const isGroup = msg.chat.type === "group" || msg.chat.type === "supergroup";
+  // Channel posts share group-like routing for thread resolution and policy lookup.
+  const isGroupOrChannel = Boolean(isChannelPost) || isGroup;
   const messageThreadId = (msg as { message_thread_id?: number }).message_thread_id;
   const isForum = (msg.chat as { is_forum?: boolean }).is_forum === true;
   const threadSpec = resolveTelegramThreadSpec({
-    isGroup,
+    isGroup: isGroupOrChannel,
     isForum,
     messageThreadId,
   });
@@ -188,7 +192,7 @@ async function resolveTelegramCommandAuth(params: {
   const groupAllowContext = await resolveTelegramGroupAllowFromContext({
     chatId,
     accountId,
-    isGroup,
+    isGroup: isGroupOrChannel,
     isForum,
     messageThreadId,
     groupAllowFrom,
@@ -206,11 +210,11 @@ async function resolveTelegramCommandAuth(params: {
   } = groupAllowContext;
   // Use direct config dmPolicy override if available for DMs
   const effectiveDmPolicy =
-    !isGroup && groupConfig && "dmPolicy" in groupConfig
+    !isGroupOrChannel && groupConfig && "dmPolicy" in groupConfig
       ? (groupConfig.dmPolicy ?? telegramCfg.dmPolicy ?? "pairing")
       : (telegramCfg.dmPolicy ?? "pairing");
   const requireTopic = (groupConfig as TelegramDirectConfig | undefined)?.requireTopic;
-  if (!isGroup && requireTopic === true && dmThreadId == null) {
+  if (!isGroupOrChannel && requireTopic === true && dmThreadId == null) {
     logVerbose(`Blocked telegram command in DM ${chatId}: requireTopic=true but no topic present`);
     return null;
   }
@@ -230,8 +234,10 @@ async function resolveTelegramCommandAuth(params: {
           Surface: "telegram",
           OriginatingChannel: "telegram",
           AccountId: accountId,
-          ChatType: isGroup ? "group" : "direct",
-          From: isGroup ? buildTelegramGroupFrom(chatId, resolvedThreadId) : `telegram:${chatId}`,
+          ChatType: isGroupOrChannel ? "group" : "direct",
+          From: isGroupOrChannel
+            ? buildTelegramGroupFrom(chatId, resolvedThreadId)
+            : `telegram:${chatId}`,
           SenderId: senderId || undefined,
           SenderUsername: senderUsername || undefined,
         },
@@ -253,7 +259,7 @@ async function resolveTelegramCommandAuth(params: {
   };
 
   const baseAccess = evaluateTelegramGroupBaseAccess({
-    isGroup,
+    isGroup: isGroupOrChannel,
     groupConfig,
     topicConfig,
     hasGroupAllowOverride,
@@ -274,7 +280,7 @@ async function resolveTelegramCommandAuth(params: {
   }
 
   const policyAccess = evaluateTelegramGroupPolicyAccess({
-    isGroup,
+    isGroup: isGroupOrChannel,
     chatId,
     cfg,
     telegramCfg,
@@ -286,7 +292,7 @@ async function resolveTelegramCommandAuth(params: {
     resolveGroupPolicy,
     enforcePolicy: useAccessGroups,
     useTopicAndGroupOverrides: false,
-    enforceAllowlistAuthorization: requireAuth && !commandsAllowFromConfigured,
+    enforceAllowlistAuthorization: !isChannelPost && requireAuth && !commandsAllowFromConfigured,
     allowEmptyAllowlistEntries: true,
     requireSenderForAllowlistAuthorization: true,
     checkChatAllowlist: useAccessGroups,
@@ -308,7 +314,7 @@ async function resolveTelegramCommandAuth(params: {
 
   const dmAllow = normalizeDmAllowFromWithStore({
     allowFrom: dmAllowFrom,
-    storeAllowFrom: isGroup ? [] : storeAllowFrom,
+    storeAllowFrom: isGroupOrChannel ? [] : storeAllowFrom,
     dmPolicy: effectiveDmPolicy,
   });
   const senderAllowed = isSenderAllowed({
@@ -319,16 +325,30 @@ async function resolveTelegramCommandAuth(params: {
   const groupSenderAllowed = isGroup
     ? isSenderAllowed({ allow: effectiveGroupAllow, senderId, senderUsername })
     : false;
+  const channelPolicy = isChannelPost && useAccessGroups ? resolveGroupPolicy(chatId) : null;
+  const commandAuthorizers = isChannelPost
+    ? useAccessGroups
+      ? [
+          // Channel posts have no human sender identity, so explicit chat allow is the auth source.
+          {
+            configured: true,
+            // policyAccess already rejects denied chats above; groupConfig here means
+            // the channel matched an explicit chat entry rather than only the "*" default.
+            allowed: Boolean(channelPolicy?.groupConfig),
+          },
+        ]
+      : []
+    : [
+        { configured: dmAllow.hasEntries, allowed: senderAllowed },
+        ...(isGroup
+          ? [{ configured: effectiveGroupAllow.hasEntries, allowed: groupSenderAllowed }]
+          : []),
+      ];
   const commandAuthorized = commandsAllowFromConfigured
     ? Boolean(commandsAllowFromAccess?.isAuthorizedSender)
     : resolveCommandAuthorizedFromAuthorizers({
         useAccessGroups,
-        authorizers: [
-          { configured: dmAllow.hasEntries, allowed: senderAllowed },
-          ...(isGroup
-            ? [{ configured: effectiveGroupAllow.hasEntries, allowed: groupSenderAllowed }]
-            : []),
-        ],
+        authorizers: commandAuthorizers,
         modeWhenAccessGroupsOff: "configured",
       });
   if (requireAuth && !commandAuthorized) {
@@ -337,7 +357,7 @@ async function resolveTelegramCommandAuth(params: {
 
   return {
     chatId,
-    isGroup,
+    isGroup: isGroupOrChannel,
     isForum,
     resolvedThreadId,
     senderId,
@@ -462,7 +482,7 @@ export const registerTelegramNativeCommands = ({
   });
 
   const resolveCommandRuntimeContext = async (params: {
-    msg: NonNullable<TelegramNativeCommandContext["message"]>;
+    msg: TelegramNativeCommandMessage;
     isGroup: boolean;
     isForum: boolean;
     resolvedThreadId?: number;
@@ -560,7 +580,7 @@ export const registerTelegramNativeCommands = ({
       for (const command of nativeCommands) {
         const normalizedCommandName = normalizeTelegramCommandName(command.name);
         bot.command(normalizedCommandName, async (ctx: TelegramNativeCommandContext) => {
-          const msg = ctx.message;
+          const msg = ctx.msg;
           if (!msg) {
             return;
           }
@@ -812,7 +832,7 @@ export const registerTelegramNativeCommands = ({
 
       for (const pluginCommand of pluginCatalog.commands) {
         bot.command(pluginCommand.command, async (ctx: TelegramNativeCommandContext) => {
-          const msg = ctx.message;
+          const msg = ctx.msg;
           if (!msg) {
             return;
           }
