@@ -16,7 +16,10 @@ export const DEFAULT_PRE_HOOK_TIMEOUT_SECONDS = 30;
 export const MAX_PRE_HOOK_TIMEOUT_SECONDS = 300;
 const MAX_OUTPUT_BYTES = 64 * 1024;
 
-export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> {
+export async function runPreHook(
+  config: PreHookConfig,
+  abortSignal?: AbortSignal,
+): Promise<PreHookResult> {
   const timeoutMs =
     Math.min(
       config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS,
@@ -28,29 +31,46 @@ export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> 
   const shellArgs = isWindows ? ["/c", config.command] : ["-c", config.command];
 
   return new Promise<PreHookResult>((resolve) => {
-    execFile(
+    const child = execFile(
       shell,
       shellArgs,
       { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES },
       (error, stdout, stderr) => {
+        cleanup();
+
         if (!error) {
           resolve({ outcome: "proceed" });
           return;
         }
 
+        // maxBuffer exceeded is not a command failure — the hook ran fine,
+        // it just produced too much output. Treat based on exit code.
+        const isMaxBuffer =
+          (error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+
         const exitCode =
           typeof error.code === "number"
             ? error.code
-            : ((error as NodeJS.ErrnoException & { status?: number }).status ?? 1);
+            : ((error as NodeJS.ErrnoException & { status?: number }).status ??
+              (isMaxBuffer ? 0 : 1));
 
-        if (error.killed) {
+        if (error.killed && !isMaxBuffer) {
+          const reason = abortSignal?.aborted
+            ? "aborted by job timeout"
+            : `timed out after ${config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS}s`;
           resolve({
             outcome: "error",
             exitCode,
             stdout: String(stdout),
             stderr: String(stderr),
-            message: `timed out after ${config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS}s`,
+            message: reason,
           });
+          return;
+        }
+
+        // For maxBuffer with exit 0, treat as proceed.
+        if (isMaxBuffer && exitCode === 0) {
+          resolve({ outcome: "proceed" });
           return;
         }
 
@@ -72,5 +92,20 @@ export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> 
         });
       },
     );
+
+    // Kill child process if the cron job's abort signal fires.
+    const onAbort = () => {
+      child.kill();
+    };
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        child.kill();
+      } else {
+        abortSignal.addEventListener("abort", onAbort, { once: true });
+      }
+    }
+    const cleanup = () => {
+      abortSignal?.removeEventListener("abort", onAbort);
+    };
   });
 }
