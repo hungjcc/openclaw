@@ -966,6 +966,8 @@ export function listSessionsFromStore(params: {
         responseUsage: entry?.responseUsage,
         modelProvider,
         model,
+        modelOverride: entry?.modelOverride,
+        providerOverride: entry?.providerOverride,
         contextTokens: entry?.contextTokens,
         deliveryContext: deliveryFields.deliveryContext,
         lastChannel: deliveryFields.lastChannel ?? entry?.lastChannel,
