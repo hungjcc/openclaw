@@ -45,6 +45,7 @@ const BUNDLED_WEB_SEARCH_CREDENTIAL_VALUES: Readonly<Record<string, unknown>> = 
   firecrawl: "fc-test",
   google: "AIza-test",
   moonshot: "sk-test",
+  parallel: "par-test",
   perplexity: "pplx-test",
   xai: "xai-test",
 };
