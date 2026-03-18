@@ -1606,6 +1606,26 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             pendingPatchText = "";
             lastSentText = "";
             patchSending = false;
+            // If the final payload carries media attachments, deliver them as
+            // follow-up posts (the in-place patch only updates the text post).
+            const hasMedia = payload.mediaUrls?.length || payload.mediaUrl;
+            if (hasMedia) {
+              await deliverMattermostReplyPayload({
+                core,
+                cfg,
+                payload: { ...payload, text: "" },
+                to,
+                accountId: account.accountId,
+                agentId: route.agentId,
+                replyToId: resolveMattermostReplyRootId({
+                  threadRootId: effectiveReplyToId,
+                  replyToId: payload.replyToId,
+                }),
+                textLimit,
+                tableMode,
+                sendMessage: sendMessageMattermost,
+              });
+            }
             return;
           }
 
