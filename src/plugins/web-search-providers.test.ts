@@ -21,6 +21,7 @@ describe("resolvePluginWebSearchProviders", () => {
       "moonshot:kimi",
       "perplexity:perplexity",
       "firecrawl:firecrawl",
+      "tavily:tavily",
     ]);
     expect(providers.map((provider) => provider.credentialPath)).toEqual([
       "plugins.entries.brave.config.webSearch.apiKey",
@@ -55,6 +56,7 @@ describe("resolvePluginWebSearchProviders", () => {
       "moonshot",
       "perplexity",
       "firecrawl",
+      "tavily",
     ]);
   });
 
