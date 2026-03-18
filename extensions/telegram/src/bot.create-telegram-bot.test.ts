@@ -388,7 +388,7 @@ describe("createTelegramBot", () => {
     dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(
       async ({ dispatcherOptions }) => {
         await dispatcherOptions.typingCallbacks?.onReplyStart?.();
-        return { queuedFinal: false, counts: {} };
+        return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
       },
     );
     createTelegramBot({ token: "tok" });
@@ -1463,7 +1463,7 @@ describe("createTelegramBot", () => {
       dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(async (params) => {
         dispatchCall = params as typeof dispatchCall;
         await params.dispatcherOptions.typingCallbacks?.onReplyStart?.();
-        return { queuedFinal: false, counts: {} };
+        return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
       });
       loadConfig.mockReturnValue({
         channels: {
@@ -1478,6 +1478,10 @@ describe("createTelegramBot", () => {
       await handler(makeForumGroupMessageCtx({ threadId: testCase.threadId }));
 
       const payload = dispatchCall?.ctx;
+      expect(payload).toBeDefined();
+      if (!payload) {
+        continue;
+      }
       if (testCase.assertTopicMetadata) {
         expect(payload.SessionKey).toContain("telegram:group:-1001234567890:topic:99");
         expect(payload.From).toBe("telegram:group:-1001234567890:topic:99");
@@ -1792,7 +1796,7 @@ describe("createTelegramBot", () => {
       | undefined;
     dispatchReplyWithBufferedBlockDispatcher.mockImplementationOnce(async (params) => {
       dispatchCall = params as typeof dispatchCall;
-      return { queuedFinal: false, counts: {} };
+      return { queuedFinal: false, counts: { tool: 0, block: 0, final: 0 } };
     });
     loadConfig.mockReturnValue({
       channels: {
@@ -1821,6 +1825,10 @@ describe("createTelegramBot", () => {
     await handler(makeForumGroupMessageCtx({ threadId: 99 }));
 
     const payload = dispatchCall?.ctx;
+    expect(payload).toBeDefined();
+    if (!payload) {
+      return;
+    }
     expect(payload.GroupSystemPrompt).toBe("Group prompt\n\nTopic prompt");
     expect(dispatchCall?.replyOptions?.skillFilter).toEqual([]);
   });

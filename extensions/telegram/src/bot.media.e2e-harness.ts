@@ -136,7 +136,7 @@ async function dispatchReplyWithBufferedBlockDispatcherViaActual(
     await getActualDispatchReplyWithBufferedBlockDispatcher();
   return await actualDispatchReplyWithBufferedBlockDispatcher({
     ...params,
-    replyResolver: async (ctx, _cfg, opts) => {
+    replyResolver: async (ctx, opts) => {
       await opts?.onReplyStart?.();
       return await mediaHarnessReplySpy(ctx, opts);
     },
