@@ -118,6 +118,7 @@ async function sendTelegramOutbound(params: {
 function resolveTelegramAutoThreadId(params: {
   to: string;
   toolContext?: { currentThreadTs?: string; currentChannelId?: string };
+  targetExplicit?: boolean;
 }): string | undefined {
   const context = params.toolContext;
   if (!context?.currentThreadTs || !context.currentChannelId) {
@@ -125,6 +126,9 @@ function resolveTelegramAutoThreadId(params: {
   }
   const parsedTo = parseTelegramTarget(params.to);
   if (parsedTo.messageThreadId != null) {
+    return undefined;
+  }
+  if (params.targetExplicit) {
     return undefined;
   }
   const parsedChannel = parseTelegramTarget(context.currentChannelId);
@@ -383,8 +387,8 @@ export const telegramPlugin: ChannelPlugin<ResolvedTelegramAccount, TelegramProb
         context.MessageThreadId != null ? String(context.MessageThreadId) : undefined,
       hasRepliedRef,
     }),
-    resolveAutoThreadId: ({ to, toolContext, replyToId }) =>
-      replyToId ? undefined : resolveTelegramAutoThreadId({ to, toolContext }),
+    resolveAutoThreadId: ({ to, toolContext, replyToId, targetExplicit }) =>
+      replyToId ? undefined : resolveTelegramAutoThreadId({ to, toolContext, targetExplicit }),
   },
   messaging: {
     normalizeTarget: normalizeTelegramMessagingTarget,

@@ -29,6 +29,7 @@ import {
 } from "./channel-selection.js";
 import type { OutboundSendDeps } from "./deliver.js";
 import { normalizeMessageActionInput } from "./message-action-normalization.js";
+import { consumeTargetInferredFromToolContext } from "./message-action-normalization.js";
 import {
   hydrateAttachmentParamsForAction,
   normalizeSandboxMediaList,
@@ -70,6 +71,7 @@ function resolveAndApplyOutboundThreadId(
     to: string;
     accountId?: string | null;
     toolContext?: ChannelThreadingToolContext;
+    targetExplicit?: boolean;
   },
 ): string | undefined {
   const threadId = readStringParam(params, "threadId");
@@ -81,6 +83,7 @@ function resolveAndApplyOutboundThreadId(
       to: ctx.to,
       toolContext: ctx.toolContext,
       replyToId: readStringParam(params, "replyTo"),
+      targetExplicit: ctx.targetExplicit,
     });
   // Write auto-resolved threadId back into params so downstream dispatch
   // (plugin `readStringParam(params, "threadId")`) picks it up.
@@ -283,6 +286,7 @@ type ResolvedActionContext = {
   params: Record<string, unknown>;
   channel: ChannelId;
   accountId?: string | null;
+  targetExplicit?: boolean;
   dryRun: boolean;
   gateway?: MessageActionRunnerGateway;
   input: RunMessageActionParams;
@@ -507,6 +511,7 @@ async function handleSendAction(ctx: ResolvedActionContext): Promise<MessageActi
     to,
     accountId,
     toolContext: input.toolContext,
+    targetExplicit: ctx.targetExplicit,
   });
   const outboundRoute =
     agentId && !dryRun
@@ -599,6 +604,7 @@ async function handlePollAction(ctx: ResolvedActionContext): Promise<MessageActi
     to,
     accountId,
     toolContext: input.toolContext,
+    targetExplicit: ctx.targetExplicit,
   });
 
   const base = typeof params.message === "string" ? params.message : "";
@@ -751,6 +757,7 @@ export async function runMessageAction(
     args: params,
     toolContext: input.toolContext,
   });
+  const targetExplicit = !consumeTargetInferredFromToolContext(params);
 
   const channel = await resolveChannel(cfg, params, input.toolContext);
   let accountId = readStringParam(params, "accountId") ?? input.defaultAccountId;
@@ -814,6 +821,7 @@ export async function runMessageAction(
       params,
       channel,
       accountId,
+      targetExplicit,
       dryRun,
       gateway,
       input,
@@ -829,6 +837,7 @@ export async function runMessageAction(
       params,
       channel,
       accountId,
+      targetExplicit,
       dryRun,
       gateway,
       input,
@@ -841,6 +850,7 @@ export async function runMessageAction(
     params,
     channel,
     accountId,
+    targetExplicit,
     dryRun,
     gateway,
     input,
