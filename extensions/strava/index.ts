@@ -29,12 +29,24 @@ const stravaPlugin = {
 
     const config: StravaConfig = { clientId, clientSecret };
     const gatewayPort = (api.config.gateway?.port as number | undefined) ?? DEFAULT_GATEWAY_PORT;
+    const callbackUrl = pluginConfig.callbackUrl as string | undefined;
 
     // Use a strava subdirectory under the main state dir for token storage.
     const stateDir = path.join(api.runtime.state.resolveStateDir(), "strava");
     const tokenStore = new TokenStore(stateDir);
 
-    const getRedirectUri = () => `http://localhost:${gatewayPort}${OAUTH_CALLBACK_PATH}`;
+    const getRedirectUri = () => {
+      // Explicit override takes priority (tunnels, custom domains).
+      if (callbackUrl) return callbackUrl;
+      // Derive from gateway bind config when not loopback.
+      const bind = api.config.gateway?.bind as string | undefined;
+      const customHost = api.config.gateway?.customBindHost as string | undefined;
+      if (bind === "custom" && customHost?.trim()) {
+        return `http://${customHost.trim()}:${gatewayPort}${OAUTH_CALLBACK_PATH}`;
+      }
+      // Default to localhost for loopback / unset bind.
+      return `http://localhost:${gatewayPort}${OAUTH_CALLBACK_PATH}`;
+    };
 
     // Register the 4 Strava tools.
     const tools = createStravaTools({ config, tokenStore, getRedirectUri });

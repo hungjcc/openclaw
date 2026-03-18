@@ -1,6 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import type { TokenStore } from "./oauth.js";
 import { buildAuthUrl, ensureFreshToken, generateOAuthState, StravaRefreshError } from "./oauth.js";
+import { StravaApiError } from "./strava-client.js";
 import * as client from "./strava-client.js";
 import type { StravaConfig } from "./types.js";
 
@@ -25,6 +26,26 @@ function notConnectedResult(deps: ToolDeps) {
         }),
       },
     ],
+  };
+}
+
+type ToolResult = { content: { type: "text"; text: string }[] };
+
+/** Wrap a tool execute fn to catch 401 StravaApiErrors (revoked token mid-session). */
+function withRevocationGuard<A extends unknown[]>(
+  deps: ToolDeps,
+  fn: (...args: A) => Promise<ToolResult>,
+) {
+  return async (...args: A): Promise<ToolResult> => {
+    try {
+      return await fn(...args);
+    } catch (err) {
+      if (err instanceof StravaApiError && err.status === 401) {
+        deps.tokenStore.clear();
+        return notConnectedResult(deps);
+      }
+      throw err;
+    }
   };
 }
 
@@ -108,7 +129,7 @@ function createActivitiesTool(deps: ToolDeps) {
         }),
       ),
     }),
-    async execute(_id: string, params: Record<string, unknown>) {
+    execute: withRevocationGuard(deps, async (_id: string, params: Record<string, unknown>) => {
       const token = await getTokenOrNull(deps);
       if (!token) return notConnectedResult(deps);
 
@@ -120,12 +141,12 @@ function createActivitiesTool(deps: ToolDeps) {
       let activities: Awaited<ReturnType<typeof client.getActivities>>;
 
       if (sportType) {
-        // Paginate until we collect enough matching activities (Strava has no
-        // server-side sport filter). Cap at 5 pages to avoid excessive requests.
+        // Paginate until we collect enough matching activities or exhaust all
+        // data. Strava has no server-side sport filter, so we page through 50
+        // activities at a time and stop when the page comes back short.
         activities = [];
         const pageSize = 50; // max Strava allows
-        const maxPages = 5;
-        for (let page = 1; page <= maxPages; page++) {
+        for (let page = 1; ; page++) {
           const batch = await client.getActivities(token, {
             perPage: pageSize,
             page,
@@ -138,7 +159,7 @@ function createActivitiesTool(deps: ToolDeps) {
               if (activities.length >= count) break;
             }
           }
-          // Stop if we have enough results or the page was not full (no more data).
+          // Stop when we have enough results or no more data.
           if (activities.length >= count || batch.length < pageSize) break;
         }
         activities = activities.slice(0, count);
@@ -170,7 +191,7 @@ function createActivitiesTool(deps: ToolDeps) {
       return {
         content: [{ type: "text" as const, text: JSON.stringify({ activities: formatted }) }],
       };
-    },
+    }),
   };
 }
 
@@ -183,7 +204,7 @@ function createActivityDetailTool(deps: ToolDeps) {
     parameters: Type.Object({
       activityId: Type.Number({ description: "The Strava activity ID." }),
     }),
-    async execute(_id: string, params: Record<string, unknown>) {
+    execute: withRevocationGuard(deps, async (_id: string, params: Record<string, unknown>) => {
       const token = await getTokenOrNull(deps);
       if (!token) return notConnectedResult(deps);
 
@@ -233,7 +254,7 @@ function createActivityDetailTool(deps: ToolDeps) {
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result) }],
       };
-    },
+    }),
   };
 }
 
@@ -244,7 +265,7 @@ function createStatsTool(deps: ToolDeps) {
     description:
       "Get the user's aggregated Strava statistics: recent, year-to-date, and all-time totals for running, cycling, and swimming.",
     parameters: Type.Object({}),
-    async execute() {
+    execute: withRevocationGuard(deps, async () => {
       const tokens = deps.tokenStore.load();
       if (!tokens) return notConnectedResult(deps);
 
@@ -288,7 +309,7 @@ function createStatsTool(deps: ToolDeps) {
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result) }],
       };
-    },
+    }),
   };
 }
 
