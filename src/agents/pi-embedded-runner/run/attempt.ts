@@ -36,6 +36,8 @@ import { isReasoningTagProvider } from "../../../utils/provider-utils.js";
 import { resolveOpenClawAgentDir } from "../../agent-paths.js";
 import { resolveSessionAgentIds } from "../../agent-scope.js";
 import { createAnthropicPayloadLogger } from "../../anthropic-payload-log.js";
+import { ensureAuthProfileStore } from "../../auth-profiles.js";
+import type { AuthProfileStore } from "../../auth-profiles.js";
 import {
   analyzeBootstrapBudget,
   buildBootstrapPromptWarning,
@@ -53,6 +55,7 @@ import { ensureCustomApiRegistered } from "../../custom-api-registry.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
 import { resolveOpenClawDocsPath } from "../../docs-path.js";
 import { isTimeoutError } from "../../failover-error.js";
+import { createGigachatStreamFn } from "../../gigachat-stream.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
 import { resolveModelAuthMode } from "../../model-auth.js";
 import { resolveToolCallArgumentsEncoding } from "../../model-compat.js";
@@ -221,6 +224,22 @@ function createYieldAbortedResponse(model: { api?: string; provider?: string; id
     async *[Symbol.asyncIterator]() {},
     result: async () => message,
   };
+}
+
+export function resolveGigachatAuthProfileMetadata(
+  store: Pick<AuthProfileStore, "profiles">,
+  authProfileId?: string,
+): Record<string, string> | undefined {
+  const profileIds = [authProfileId?.trim(), "gigachat:default"].filter(
+    (profileId): profileId is string => Boolean(profileId),
+  );
+  for (const profileId of profileIds) {
+    const credential = store.profiles[profileId];
+    if (credential?.type === "api_key" && credential.provider === "gigachat") {
+      return credential.metadata;
+    }
+  }
+  return undefined;
 }
 
 // Queue a hidden steering message so pi-agent-core skips any remaining tool calls.
@@ -1277,7 +1296,7 @@ export function prependSystemPromptAddition(params: {
 
 /** Build runtime context passed into context-engine afterTurn hooks. */
 export function buildAfterTurnRuntimeContext(params: {
-  attempt: Pick<
+  attempt?: Pick<
     EmbeddedRunAttemptParams,
     | "sessionKey"
     | "messageChannel"
@@ -1302,28 +1321,36 @@ export function buildAfterTurnRuntimeContext(params: {
   workspaceDir: string;
   agentDir: string;
 }): Partial<CompactEmbeddedPiSessionParams> {
+  const attempt = params.attempt;
+  if (!attempt) {
+    return {
+      workspaceDir: params.workspaceDir,
+      agentDir: params.agentDir,
+    };
+  }
+
   return buildEmbeddedCompactionRuntimeContext({
-    sessionKey: params.attempt.sessionKey,
-    messageChannel: params.attempt.messageChannel,
-    messageProvider: params.attempt.messageProvider,
-    agentAccountId: params.attempt.agentAccountId,
-    currentChannelId: params.attempt.currentChannelId,
-    currentThreadTs: params.attempt.currentThreadTs,
-    currentMessageId: params.attempt.currentMessageId,
-    authProfileId: params.attempt.authProfileId,
+    sessionKey: attempt.sessionKey,
+    messageChannel: attempt.messageChannel,
+    messageProvider: attempt.messageProvider,
+    agentAccountId: attempt.agentAccountId,
+    currentChannelId: attempt.currentChannelId,
+    currentThreadTs: attempt.currentThreadTs,
+    currentMessageId: attempt.currentMessageId,
+    authProfileId: attempt.authProfileId,
     workspaceDir: params.workspaceDir,
     agentDir: params.agentDir,
-    config: params.attempt.config,
-    skillsSnapshot: params.attempt.skillsSnapshot,
-    senderIsOwner: params.attempt.senderIsOwner,
-    senderId: params.attempt.senderId,
-    provider: params.attempt.provider,
-    modelId: params.attempt.modelId,
-    thinkLevel: params.attempt.thinkLevel,
-    reasoningLevel: params.attempt.reasoningLevel,
-    bashElevated: params.attempt.bashElevated,
-    extraSystemPrompt: params.attempt.extraSystemPrompt,
-    ownerNumbers: params.attempt.ownerNumbers,
+    config: attempt.config,
+    skillsSnapshot: attempt.skillsSnapshot,
+    senderIsOwner: attempt.senderIsOwner,
+    senderId: attempt.senderId,
+    provider: attempt.provider,
+    modelId: attempt.modelId,
+    thinkLevel: attempt.thinkLevel,
+    reasoningLevel: attempt.reasoningLevel,
+    bashElevated: attempt.bashElevated,
+    extraSystemPrompt: attempt.extraSystemPrompt,
+    ownerNumbers: attempt.ownerNumbers,
   });
 }
 
@@ -1954,6 +1981,28 @@ export async function runEmbeddedAttempt(
         });
         activeSession.agent.streamFn = ollamaStreamFn;
         ensureCustomApiRegistered(params.model.api, ollamaStreamFn);
+      } else if (normalizeProviderId(params.provider) === "gigachat") {
+        const providerConfig = params.config?.models?.providers?.[params.provider];
+        const baseUrl =
+          (typeof providerConfig?.baseUrl === "string" ? providerConfig.baseUrl : undefined) ??
+          (typeof params.model.baseUrl === "string" ? params.model.baseUrl : undefined) ??
+          process.env.GIGACHAT_BASE_URL?.trim() ??
+          "https://gigachat.devices.sberbank.ru/api/v1";
+
+        // Read GigaChat-specific config from auth profile credential metadata.
+        const gigachatStore = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
+        const gigachatMeta = resolveGigachatAuthProfileMetadata(
+          gigachatStore,
+          params.authProfileId,
+        );
+
+        const gigachatStreamFn = createGigachatStreamFn({
+          baseUrl,
+          authMode: (gigachatMeta?.authMode as "oauth" | "basic") ?? "oauth",
+          insecureTls: gigachatMeta?.insecureTls === "true",
+          scope: gigachatMeta?.scope,
+        });
+        activeSession.agent.streamFn = gigachatStreamFn;
       } else if (params.model.api === "openai-responses" && params.provider === "openai") {
         const wsApiKey = await params.authStorage.getApiKey(params.provider);
         if (wsApiKey) {

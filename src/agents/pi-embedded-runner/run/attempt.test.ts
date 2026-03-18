@@ -8,6 +8,7 @@ import {
   composeSystemPromptWithHookContext,
   isOllamaCompatProvider,
   prependSystemPromptAddition,
+  resolveGigachatAuthProfileMetadata,
   resolveAttemptFsWorkspaceOnly,
   resolveOllamaCompatNumCtxEnabled,
   resolvePromptBuildHookResult,
@@ -138,6 +139,69 @@ describe("resolvePromptBuildHookResult", () => {
     expect(result.prependContext).toBe("prompt context\n\nlegacy context");
     expect(result.prependSystemContext).toBe("prompt prepend\n\nlegacy prepend");
     expect(result.appendSystemContext).toBe("prompt append\n\nlegacy append");
+  });
+});
+
+describe("resolveGigachatAuthProfileMetadata", () => {
+  it("prefers the active GigaChat auth profile metadata over the default profile", () => {
+    expect(
+      resolveGigachatAuthProfileMetadata(
+        {
+          profiles: {
+            "gigachat:default": {
+              type: "api_key",
+              provider: "gigachat",
+              metadata: { scope: "GIGACHAT_API_PERS", insecureTls: "false" },
+            },
+            "gigachat:business": {
+              type: "api_key",
+              provider: "gigachat",
+              metadata: { scope: "GIGACHAT_API_B2B", insecureTls: "true" },
+            },
+          },
+        },
+        "gigachat:business",
+      ),
+    ).toEqual({ scope: "GIGACHAT_API_B2B", insecureTls: "true" });
+  });
+
+  it("falls back to the default GigaChat profile metadata when the active profile is absent", () => {
+    expect(
+      resolveGigachatAuthProfileMetadata(
+        {
+          profiles: {
+            "gigachat:default": {
+              type: "api_key",
+              provider: "gigachat",
+              metadata: { scope: "GIGACHAT_API_PERS", insecureTls: "false" },
+            },
+          },
+        },
+        "gigachat:business",
+      ),
+    ).toEqual({ scope: "GIGACHAT_API_PERS", insecureTls: "false" });
+  });
+
+  it("ignores non-GigaChat active profiles when resolving metadata", () => {
+    expect(
+      resolveGigachatAuthProfileMetadata(
+        {
+          profiles: {
+            "gigachat:default": {
+              type: "api_key",
+              provider: "gigachat",
+              metadata: { scope: "GIGACHAT_API_PERS" },
+            },
+            "openai:p1": {
+              type: "api_key",
+              provider: "openai",
+              metadata: { scope: "not-gigachat" },
+            },
+          },
+        },
+        "openai:p1",
+      ),
+    ).toEqual({ scope: "GIGACHAT_API_PERS" });
   });
 });
 
@@ -1154,6 +1218,18 @@ describe("prependSystemPromptAddition", () => {
 });
 
 describe("buildAfterTurnRuntimeContext", () => {
+  it("returns workspace-only context when attempt data is missing", () => {
+    const legacy = buildAfterTurnRuntimeContext({
+      workspaceDir: "/tmp/workspace",
+      agentDir: "/tmp/agent",
+    });
+
+    expect(legacy).toEqual({
+      workspaceDir: "/tmp/workspace",
+      agentDir: "/tmp/agent",
+    });
+  });
+
   it("uses primary model when compaction.model is not set", () => {
     const legacy = buildAfterTurnRuntimeContext({
       attempt: {
