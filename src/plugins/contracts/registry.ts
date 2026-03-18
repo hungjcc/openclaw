@@ -97,27 +97,33 @@ const staticBundledProviderPlugins: RegistrablePlugin[] = [
   zaiPlugin,
 ];
 
-function buildStaticProviderEntries(): ProviderContractEntry[] {
+function buildStaticProviderEntries(): {
+  entries: ProviderContractEntry[];
+  succeededPluginIds: Set<string>;
+} {
   // Process each plugin individually so one register() failure does not wipe out the rest.
+  // Track only the plugins that actually succeeded so failed ones can fall back to jiti.
   const entries: ProviderContractEntry[] = [];
+  const succeededPluginIds = new Set<string>();
   for (const plugin of staticBundledProviderPlugins) {
     try {
       const captured = capturePluginRegistration(plugin);
       for (const provider of captured.providers) {
         entries.push({ pluginId: plugin.id, provider });
       }
+      succeededPluginIds.add(plugin.id);
     } catch {
-      // Skip this plugin; absent providers may still be loaded by the jiti supplement path.
+      // Skip this plugin; it will be loaded by the jiti supplement path instead.
     }
   }
-  return entries;
+  return { entries, succeededPluginIds };
 }
 
 function loadBundledProviderRegistry(): ProviderContractEntry[] {
   // Start with statically-imported providers (reliable in all vitest pool modes).
-  // Individual register() failures are isolated inside buildStaticProviderEntries.
-  const staticEntries = buildStaticProviderEntries();
-  const staticPluginIdSet = new Set(staticBundledProviderPlugins.map((p) => p.id));
+  // Individual register() failures fall back to jiti so no provider entries are lost.
+  const { entries: staticEntries, succeededPluginIds: staticPluginIdSet } =
+    buildStaticProviderEntries();
 
   // Supplement with jiti-loaded providers for the ~23 bundled plugins not in
   // the static list (e.g. amazon-bedrock, ollama, openrouter, and similar).
