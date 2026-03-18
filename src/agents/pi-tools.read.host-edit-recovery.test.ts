@@ -108,8 +108,8 @@ describe("CRLF line ending false positive (issue #49363)", () => {
     await fs.writeFile(filePath, `before\r\nnew line\r\nmore new\r\nafter\r\n`, "utf-8");
 
     const tool = createHostWorkspaceEditTool(tmpDir);
-    // This should succeed (recovery should detect newText is present despite CRLF)
-    // But currently FAILS because content.includes(newText) checks LF against CRLF
+    // Verify that the recovery path correctly detects newText is present despite
+    // the file on disk using CRLF line endings while the param uses LF (issue #49363).
     const result = await tool.execute("call-crlf", { path: filePath, oldText, newText }, undefined);
 
     expect(result).toBeDefined();
