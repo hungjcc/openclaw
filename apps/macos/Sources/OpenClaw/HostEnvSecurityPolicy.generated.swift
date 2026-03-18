@@ -10,25 +10,43 @@ enum HostEnvSecurityPolicy {
         "NODE_PATH",
         "PYTHONHOME",
         "PYTHONPATH",
+        "PYTHONSTARTUP",
+        "PYTHONWARNINGS",
+        "PYTHONBREAKPOINT",
         "PERL5LIB",
         "PERL5OPT",
+        "PERL_MB_OPT",
         "RUBYLIB",
         "RUBYOPT",
         "BASH_ENV",
         "ENV",
         "GIT_EXTERNAL_DIFF",
         "GIT_EXEC_PATH",
+        "GIT_SSH_COMMAND",
         "SHELL",
         "SHELLOPTS",
         "PS4",
         "GCONV_PATH",
         "IFS",
         "SSLKEYLOGFILE",
+        "GLIBC_TUNABLES",
         "JAVA_TOOL_OPTIONS",
+        "JAVA_OPTIONS",
         "_JAVA_OPTIONS",
         "JDK_JAVA_OPTIONS",
-        "PYTHONBREAKPOINT",
-        "DOTNET_STARTUP_HOOKS"
+        "DOTNET_STARTUP_HOOKS",
+        "LD_AUDIT",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "EDITOR",
+        "VISUAL",
+        "PAGER",
+        "BROWSER",
+        "PROMPT_COMMAND",
+        "SDKMAN_DIR",
+        "NVM_DIR",
+        "GOPATH",
+        "CARGO_HOME"
     ]
 
     static let blockedOverrideKeys: Set<String> = [
@@ -67,6 +85,7 @@ enum HostEnvSecurityPolicy {
     static let blockedPrefixes: [String] = [
         "DYLD_",
         "LD_",
-        "BASH_FUNC_"
+        "BASH_FUNC_",
+        "OPENCLAW_"
     ]
 }
