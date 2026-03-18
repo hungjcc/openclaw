@@ -1361,6 +1361,9 @@ export function registerSubagentRun(params: {
   retainAttachmentsOnKeep?: boolean;
   extraSystemPrompt?: string;
   thinking?: string;
+  groupId?: string;
+  groupChannel?: string;
+  groupSpace?: string;
 }) {
   const now = Date.now();
   const cfg = loadConfig();
@@ -1385,6 +1388,9 @@ export function registerSubagentRun(params: {
     label: params.label,
     model: params.model,
     workspaceDir: params.workspaceDir,
+    groupId: params.groupId,
+    groupChannel: params.groupChannel,
+    groupSpace: params.groupSpace,
     spawnDepth: params.spawnDepth,
     runTimeoutSeconds,
     createdAt: now,
