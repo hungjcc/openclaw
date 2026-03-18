@@ -1,5 +1,10 @@
 import { Type } from "@sinclair/typebox";
-import type { WebSearchProviderPlugin } from "openclaw/plugin-sdk/plugin-runtime";
+import {
+  enablePluginInConfig,
+  resolveProviderWebSearchPluginConfig,
+  setProviderWebSearchPluginConfigValue,
+  type WebSearchProviderPlugin,
+} from "openclaw/plugin-sdk/provider-web-search";
 import { runTavilySearch } from "./tavily-client.js";
 
 const GenericTavilySearchSchema = Type.Object(
@@ -46,8 +51,16 @@ export function createTavilyWebSearchProvider(): WebSearchProviderPlugin {
     signupUrl: "https://tavily.com/",
     docsUrl: "https://docs.openclaw.ai/tools/tavily",
     autoDetectOrder: 70,
+    credentialPath: "plugins.entries.tavily.config.webSearch.apiKey",
+    inactiveSecretPaths: ["plugins.entries.tavily.config.webSearch.apiKey"],
     getCredentialValue: getScopedCredentialValue,
     setCredentialValue: setScopedCredentialValue,
+    getConfiguredCredentialValue: (config) =>
+      resolveProviderWebSearchPluginConfig(config, "tavily")?.apiKey,
+    setConfiguredCredentialValue: (configTarget, value) => {
+      setProviderWebSearchPluginConfigValue(configTarget, "tavily", "apiKey", value);
+    },
+    applySelectionConfig: (config) => enablePluginInConfig(config, "tavily").config,
     createTool: (ctx) => ({
       description:
         "Search the web using Tavily. Returns structured results with snippets. Use tavily_search for Tavily-specific options like search depth, topic filtering, or AI answers.",
