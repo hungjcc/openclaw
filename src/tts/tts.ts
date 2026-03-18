@@ -561,7 +561,7 @@ function resolveTtsProviderBaseUrl(
   return cfg.models?.providers?.[provider]?.baseUrl;
 }
 
-export const TTS_PROVIDERS = ["openai", "elevenlabs", "edge"] as const;
+export const TTS_PROVIDERS = ["openai", "elevenlabs", "edge", "microsoft"] as const;
 
 export function resolveTtsProviderOrder(primary: TtsProvider, cfg?: OpenClawConfig): TtsProvider[] {
   const normalizedPrimary = normalizeSpeechProviderId(primary) ?? primary;
