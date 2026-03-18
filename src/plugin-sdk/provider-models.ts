@@ -57,6 +57,8 @@ export {
   MODELSTUDIO_DEFAULT_MODEL_ID,
   MODELSTUDIO_DEFAULT_MODEL_REF,
   MODELSTUDIO_GLOBAL_BASE_URL,
+  MODELSTUDIO_STANDARD_CN_BASE_URL,
+  MODELSTUDIO_STANDARD_GLOBAL_BASE_URL,
 } from "../../extensions/modelstudio/model-definitions.js";
 export { MOONSHOT_BASE_URL } from "../../extensions/moonshot/provider-catalog.js";
 export { MOONSHOT_CN_BASE_URL } from "../../extensions/moonshot/onboard.js";
