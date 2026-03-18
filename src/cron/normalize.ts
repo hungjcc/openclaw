@@ -406,6 +406,25 @@ export function normalizeCronJobInput(
     next.delivery = coerceDelivery(base.delivery);
   }
 
+  // Pre-hook normalization
+  if ("preHook" in base) {
+    if (isRecord(base.preHook)) {
+      const command = typeof base.preHook.command === "string" ? base.preHook.command.trim() : "";
+      if (command) {
+        const normalized: UnknownRecord = { command };
+        if (
+          typeof base.preHook.timeoutSeconds === "number" &&
+          Number.isFinite(base.preHook.timeoutSeconds)
+        ) {
+          normalized.timeoutSeconds = Math.max(1, Math.floor(base.preHook.timeoutSeconds));
+        }
+        next.preHook = normalized;
+      }
+    } else if (base.preHook === null || base.preHook === undefined) {
+      delete next.preHook;
+    }
+  }
+
   if ("isolation" in next) {
     delete next.isolation;
   }

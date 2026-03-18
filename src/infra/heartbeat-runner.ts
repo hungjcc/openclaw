@@ -552,6 +552,21 @@ export async function runHeartbeatOnce(opts: {
     return { status: "skipped", reason: "requests-in-flight" };
   }
 
+  // Pre-hook gate: run optional shell command before the heartbeat.
+  const preHookConfig = heartbeat?.preHook;
+  if (preHookConfig?.command) {
+    const { runPreHook } = await import("../cron/pre-hook.js");
+    const hookResult = await runPreHook(preHookConfig);
+    if (hookResult.outcome === "skip") {
+      log.info("heartbeat: pre-hook returned skip");
+      return { status: "skipped", reason: "pre-hook-skip" };
+    }
+    if (hookResult.outcome === "error") {
+      log.warn(`heartbeat: pre-hook failed: ${hookResult.message}`);
+      return { status: "failed", reason: `pre-hook: ${hookResult.message}` };
+    }
+  }
+
   // Preflight centralizes trigger classification, event inspection, and HEARTBEAT.md gating.
   const preflight = await resolveHeartbeatPreflight({
     cfg,

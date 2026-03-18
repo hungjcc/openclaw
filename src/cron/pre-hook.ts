@@ -1,0 +1,66 @@
+import { execFile } from "node:child_process";
+
+export type PreHookConfig = {
+  command: string;
+  timeoutSeconds?: number;
+};
+
+export type PreHookResult =
+  | { outcome: "proceed" }
+  | { outcome: "skip"; stdout: string; stderr: string }
+  | { outcome: "error"; exitCode: number; stdout: string; stderr: string; message: string };
+
+export const PRE_HOOK_SKIP_EXIT_CODE = 10;
+export const DEFAULT_PRE_HOOK_TIMEOUT_SECONDS = 30;
+const MAX_OUTPUT_BYTES = 64 * 1024;
+
+export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> {
+  const timeoutMs = (config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS) * 1000;
+
+  return new Promise<PreHookResult>((resolve) => {
+    execFile(
+      "/bin/sh",
+      ["-c", config.command],
+      { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES },
+      (error, stdout, stderr) => {
+        if (!error) {
+          resolve({ outcome: "proceed" });
+          return;
+        }
+
+        const exitCode =
+          typeof error.code === "number"
+            ? error.code
+            : ((error as NodeJS.ErrnoException & { status?: number }).status ?? 1);
+
+        if (error.killed || (error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
+          resolve({
+            outcome: "error",
+            exitCode,
+            stdout: String(stdout),
+            stderr: String(stderr),
+            message: `timed out after ${config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS}s`,
+          });
+          return;
+        }
+
+        if (exitCode === PRE_HOOK_SKIP_EXIT_CODE) {
+          resolve({
+            outcome: "skip",
+            stdout: String(stdout),
+            stderr: String(stderr),
+          });
+          return;
+        }
+
+        resolve({
+          outcome: "error",
+          exitCode,
+          stdout: String(stdout),
+          stderr: String(stderr),
+          message: `exited with code ${exitCode}`,
+        });
+      },
+    );
+  });
+}
