@@ -51,6 +51,7 @@ export type PluginLoadOptions = {
   logger?: PluginLogger;
   coreGatewayHandlers?: Record<string, GatewayRequestHandler>;
   runtimeOptions?: CreatePluginRuntimeOptions;
+  inheritSharedRuntimeOptions?: boolean;
   cache?: boolean;
   mode?: "full" | "validate";
   onlyPluginIds?: string[];
