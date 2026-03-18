@@ -105,6 +105,11 @@ export {
   SYNTHETIC_MODEL_CATALOG,
 } from "../agents/synthetic-models.js";
 export {
+  buildNovitaModelDefinition,
+  NOVITA_BASE_URL,
+  NOVITA_MODEL_CATALOG,
+} from "../agents/novita-models.js";
+export {
   buildTogetherModelDefinition,
   TOGETHER_BASE_URL,
   TOGETHER_MODEL_CATALOG,

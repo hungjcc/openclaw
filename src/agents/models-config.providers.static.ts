@@ -14,6 +14,7 @@ export {
   buildModelStudioProvider,
 } from "../../extensions/modelstudio/provider-catalog.js";
 export { buildMoonshotProvider } from "../../extensions/moonshot/provider-catalog.js";
+export { buildNovitaProvider } from "../../extensions/novita/provider-catalog.js";
 export { buildNvidiaProvider } from "../../extensions/nvidia/provider-catalog.js";
 export { buildOpenAICodexProvider } from "../../extensions/openai/openai-codex-catalog.js";
 export { buildOpenrouterProvider } from "../../extensions/openrouter/provider-catalog.js";

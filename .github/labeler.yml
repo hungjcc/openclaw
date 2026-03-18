@@ -294,6 +294,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - "extensions/talk-voice/**"
+"extensions: novita":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "extensions/novita/**"
 "extensions: together":
   - changed-files:
       - any-glob-to-any-file:

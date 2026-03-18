@@ -11,6 +11,7 @@ import MINIMAX_MANIFEST from "../../extensions/minimax/openclaw.plugin.json" wit
 import MISTRAL_MANIFEST from "../../extensions/mistral/openclaw.plugin.json" with { type: "json" };
 import MODELSTUDIO_MANIFEST from "../../extensions/modelstudio/openclaw.plugin.json" with { type: "json" };
 import MOONSHOT_MANIFEST from "../../extensions/moonshot/openclaw.plugin.json" with { type: "json" };
+import NOVITA_MANIFEST from "../../extensions/novita/openclaw.plugin.json" with { type: "json" };
 import NVIDIA_MANIFEST from "../../extensions/nvidia/openclaw.plugin.json" with { type: "json" };
 import OLLAMA_MANIFEST from "../../extensions/ollama/openclaw.plugin.json" with { type: "json" };
 import OPENAI_MANIFEST from "../../extensions/openai/openclaw.plugin.json" with { type: "json" };
@@ -72,6 +73,7 @@ export const BUNDLED_PROVIDER_AUTH_ENV_VAR_CANDIDATES = collectBundledProviderAu
   MISTRAL_MANIFEST,
   MODELSTUDIO_MANIFEST,
   MOONSHOT_MANIFEST,
+  NOVITA_MANIFEST,
   NVIDIA_MANIFEST,
   OLLAMA_MANIFEST,
   OPENAI_MANIFEST,

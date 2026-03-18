@@ -43,6 +43,7 @@ export const BUNDLED_ENABLED_BY_DEFAULT = new Set<string>([
   "mistral",
   "modelstudio",
   "moonshot",
+  "novita",
   "nvidia",
   "ollama",
   "openai",
