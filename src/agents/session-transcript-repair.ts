@@ -406,12 +406,13 @@ export function repairToolUseResultPairing(messages: AgentMessage[]): ToolUseRep
         const stripped = content.filter(
           (b: { type?: string }) => b && b.type !== "toolCall" && b.type !== "toolUse",
         );
-        const strippedIds = errorToolCalls.map((t) => t.id);
-        added.push(...strippedIds.map((id) => `stripped-error-${id}`));
         changed = true;
         out.push({
           ...assistant,
-          content: stripped.length > 0 ? stripped : [{ type: "text" as const, text: "[tool calls from errored turn stripped]" }],
+          content:
+            stripped.length > 0
+              ? stripped
+              : [{ type: "text" as const, text: "[tool calls from errored turn stripped]" }],
         } as typeof assistant);
       } else {
         out.push(msg);
