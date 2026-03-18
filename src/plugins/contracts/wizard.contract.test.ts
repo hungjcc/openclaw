@@ -1,14 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import {
+  buildProviderPluginMethodChoice,
+  resolveProviderModelPickerEntriesFromProviders,
+  resolveProviderPluginChoice,
+  resolveProviderWizardOptionsFromProviders,
+} from "../provider-wizard.js";
 import type { ProviderPlugin } from "../types.js";
+import { providerContractRegistry } from "./registry.js";
 
-const resolvePluginProvidersMock = vi.fn();
-
-let buildProviderPluginMethodChoice: typeof import("../provider-wizard.js").buildProviderPluginMethodChoice;
-let providerContractPluginIds: typeof import("./registry.js").providerContractPluginIds;
-let resolveProviderModelPickerEntries: typeof import("../provider-wizard.js").resolveProviderModelPickerEntries;
-let resolveProviderPluginChoice: typeof import("../provider-wizard.js").resolveProviderPluginChoice;
-let resolveProviderWizardOptions: typeof import("../provider-wizard.js").resolveProviderWizardOptions;
-let uniqueProviderContractProviders: typeof import("./registry.js").uniqueProviderContractProviders;
+function resolveContractProviders(): ProviderPlugin[] {
+  return [
+    ...new Map(
+      providerContractRegistry.map((entry) => [entry.provider.id, entry.provider]),
+    ).values(),
+  ];
+}
 
 function resolveExpectedWizardChoiceValues(providers: ProviderPlugin[]) {
   const values: string[] = [];
@@ -67,50 +73,24 @@ function resolveExpectedModelPickerValues(providers: ProviderPlugin[]) {
 }
 
 describe("provider wizard contract", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.doUnmock("../providers.js");
-    ({ providerContractPluginIds, uniqueProviderContractProviders } =
-      await import("./registry.js"));
-    resolvePluginProvidersMock.mockReset();
-    resolvePluginProvidersMock.mockReturnValue(uniqueProviderContractProviders);
-    vi.doMock("../providers.js", () => ({
-      resolvePluginProviders: (...args: unknown[]) => resolvePluginProvidersMock(...args),
-    }));
-    ({
-      buildProviderPluginMethodChoice,
-      resolveProviderModelPickerEntries,
-      resolveProviderPluginChoice,
-      resolveProviderWizardOptions,
-    } = await import("../provider-wizard.js"));
-  });
-
   it("exposes every registered provider setup choice through the shared wizard layer", () => {
-    const options = resolveProviderWizardOptions({
-      config: {
-        plugins: {
-          enabled: true,
-          allow: providerContractPluginIds,
-          slots: {
-            memory: "none",
-          },
-        },
-      },
-      env: process.env,
-    });
+    const providers = resolveContractProviders();
+    const options = resolveProviderWizardOptionsFromProviders(providers);
 
     expect(
       options.map((option) => option.value).toSorted((left, right) => left.localeCompare(right)),
-    ).toEqual(resolveExpectedWizardChoiceValues(uniqueProviderContractProviders));
+    ).toEqual(resolveExpectedWizardChoiceValues(providers));
     expect(options.map((option) => option.value)).toEqual([
       ...new Set(options.map((option) => option.value)),
     ]);
   });
 
   it("round-trips every shared wizard choice back to its provider and auth method", () => {
-    for (const option of resolveProviderWizardOptions({ config: {}, env: process.env })) {
+    const providers = resolveContractProviders();
+
+    for (const option of resolveProviderWizardOptionsFromProviders(providers)) {
       const resolved = resolveProviderPluginChoice({
-        providers: uniqueProviderContractProviders,
+        providers,
         choice: option.value,
       });
       expect(resolved).not.toBeNull();
@@ -120,14 +100,15 @@ describe("provider wizard contract", () => {
   });
 
   it("exposes every registered model-picker entry through the shared wizard layer", () => {
-    const entries = resolveProviderModelPickerEntries({ config: {}, env: process.env });
+    const providers = resolveContractProviders();
+    const entries = resolveProviderModelPickerEntriesFromProviders(providers);
 
     expect(
       entries.map((entry) => entry.value).toSorted((left, right) => left.localeCompare(right)),
-    ).toEqual(resolveExpectedModelPickerValues(uniqueProviderContractProviders));
+    ).toEqual(resolveExpectedModelPickerValues(providers));
     for (const entry of entries) {
       const resolved = resolveProviderPluginChoice({
-        providers: uniqueProviderContractProviders,
+        providers,
         choice: entry.value,
       });
       expect(resolved).not.toBeNull();
