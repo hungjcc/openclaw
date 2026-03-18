@@ -112,6 +112,7 @@ export type ChatProps = {
   // Pagination
   historyCursor?: string | null;
   historyHasMore?: boolean;
+  historyRenderOffset?: number;
   onLoadMoreHistory?: () => void;
 };
 
@@ -905,7 +906,7 @@ export function renderChat(props: ChatProps) {
                 <button
                   class="chat-load-more__btn"
                   @click=${props.onLoadMoreHistory}
-                  ?disabled=${props.loading}
+                  ?disabled=${props.loading || props.sending}
                 >
                   Load earlier messages
                 </button>
@@ -1400,14 +1401,17 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const history = Array.isArray(props.messages) ? props.messages : [];
   const tools = Array.isArray(props.toolMessages) ? props.toolMessages : [];
-  const historyStart = Math.max(0, history.length - CHAT_HISTORY_RENDER_LIMIT);
+  const renderOffset =
+    typeof props.historyRenderOffset === "number" ? props.historyRenderOffset : 0;
+  const effectiveLimit = CHAT_HISTORY_RENDER_LIMIT + renderOffset;
+  const historyStart = Math.max(0, history.length - effectiveLimit);
   if (historyStart > 0) {
     items.push({
       kind: "message",
       key: "chat:history:notice",
       message: {
         role: "system",
-        content: `Showing last ${CHAT_HISTORY_RENDER_LIMIT} messages (${historyStart} hidden).`,
+        content: `Showing last ${effectiveLimit} messages (${historyStart} hidden).`,
         timestamp: Date.now(),
       },
     });

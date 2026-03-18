@@ -89,8 +89,10 @@ export async function loadChatHistory(state: ChatState, before?: string) {
 
     if (before) {
       state.chatMessages = [...filtered, ...state.chatMessages];
+      state.chatHistoryRenderOffset += filtered.length;
     } else {
       state.chatMessages = filtered;
+      state.chatHistoryRenderOffset = 0;
     }
 
     state.chatThinkingLevel = res.thinkingLevel ?? null;

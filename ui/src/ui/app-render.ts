@@ -1456,6 +1456,7 @@ export function renderApp(state: AppViewState) {
                 // Pagination props
                 historyCursor: state.chatHistoryCursor,
                 historyHasMore: state.chatHistoryHasMore,
+                historyRenderOffset: state.chatHistoryRenderOffset,
                 onLoadMoreHistory: () => {
                   const prevCount = state.chatMessages.length;
                   void loadChatHistory(state, state.chatHistoryCursor ?? undefined).then(() => {
