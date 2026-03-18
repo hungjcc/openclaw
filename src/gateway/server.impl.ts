@@ -49,6 +49,7 @@ import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js
 import { resolveConfiguredDeferredChannelPluginIds } from "../plugins/channel-plugin-ids.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
+import { getActivePluginRegistryKey } from "../plugins/runtime.js";
 import { createPluginRuntime } from "../plugins/runtime/index.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
@@ -519,6 +520,7 @@ export async function startGatewayServer(
   const baseMethods = listGatewayMethods();
   const emptyPluginRegistry = createEmptyPluginRegistry();
   let pluginRegistry = emptyPluginRegistry;
+  let pluginRegistryCacheKey: string | null = null;
   let baseGatewayMethods = baseMethods;
   if (!minimalTestGateway) {
     ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = loadGatewayPlugins({
@@ -529,6 +531,7 @@ export async function startGatewayServer(
       baseMethods,
       preferSetupRuntimeForChannelPlugins: deferredConfiguredChannelPluginIds.length > 0,
     }));
+    pluginRegistryCacheKey = getActivePluginRegistryKey();
   }
   const channelLogs = Object.fromEntries(
     listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]),
@@ -629,6 +632,10 @@ export async function startGatewayServer(
     channelLogs,
     channelRuntimeEnvs,
     resolveChannelRuntime: getChannelRuntime,
+    resolvePluginRuntimeState: () => ({
+      registry: pluginRegistry,
+      cacheKey: pluginRegistryCacheKey,
+    }),
   });
   const getReadiness = createReadinessChecker({
     channelManager,
@@ -995,6 +1002,7 @@ export async function startGatewayServer(
         baseMethods,
         logDiagnostics: false,
       }));
+      pluginRegistryCacheKey = getActivePluginRegistryKey();
     }
     ({ browserControl, pluginServices } = await startGatewaySidecars({
       cfg: cfgAtStart,
