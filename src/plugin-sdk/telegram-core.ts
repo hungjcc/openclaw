@@ -13,3 +13,5 @@ export {
 } from "../agents/tools/common.js";
 export { TelegramConfigSchema } from "../config/zod-schema.providers-core.js";
 export { resolvePollMaxSelections } from "../polls.js";
+export { resolveTelegramInlineButtonsScope } from "../../extensions/telegram/src/inline-buttons.js";
+export { resolveTelegramReactionLevel } from "../../extensions/telegram/src/reaction-level.js";
