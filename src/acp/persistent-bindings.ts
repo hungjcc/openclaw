@@ -1,19 +1,21 @@
 export {
+  resolveConfiguredAcpBindingRecord,
+  resolveConfiguredAcpBindingRecordForConversation,
+  resolveConfiguredAcpBindingSpecBySessionKey,
+} from "./persistent-bindings.resolve.js";
+
+export {
+  ensureConfiguredAcpBindingReady,
+  ensureConfiguredAcpBindingSession,
+  resetAcpSessionInPlace,
+} from "./persistent-bindings.lifecycle.js";
+
+export {
   buildConfiguredAcpSessionKey,
   normalizeBindingConfig,
   normalizeMode,
   normalizeText,
+  parseConfiguredAcpSessionKey,
   toConfiguredAcpBindingRecord,
-  type AcpBindingConfigShape,
-  type ConfiguredAcpBindingChannel,
-  type ConfiguredAcpBindingSpec,
-  type ResolvedConfiguredAcpBinding,
+  toResolvedConfiguredAcpBinding,
 } from "./persistent-bindings.types.js";
-export {
-  ensureConfiguredAcpBindingSession,
-  resetAcpSessionInPlace,
-} from "./persistent-bindings.lifecycle.js";
-export {
-  resolveConfiguredAcpBindingRecord,
-  resolveConfiguredAcpBindingSpecBySessionKey,
-} from "./persistent-bindings.resolve.js";
