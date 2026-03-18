@@ -5,14 +5,18 @@ export {
   ToolPolicySchema,
   buildChannelConfigSchema,
   buildChannelKeyCandidates,
+  buildPendingHistoryContextFromMap,
   buildProbeChannelStatusSummary,
   buildSecretInputSchema,
+  clearHistoryEntriesIfEnabled,
   collectStatusIssuesFromLastError,
   compileAllowlist,
   createActionGate,
+  createLoggerBackedRuntime,
   createReplyPrefixOptions,
   createScopedPairingAccess,
   createTypingCallbacks,
+  DEFAULT_GROUP_HISTORY_LIMIT,
   dispatchReplyFromConfigWithSettledDispatcher,
   evaluateGroupRouteAccessForPolicy,
   fetchWithSsrFGuard,
@@ -31,6 +35,7 @@ export {
   readReactionParams,
   readStoreAllowFromForDmPolicy,
   readStringParam,
+  recordPendingHistoryEntryIfEnabled,
   resolveAllowlistProviderRuntimeGroupPolicy,
   resolveChannelEntryMatch,
   resolveCompiledAllowlistMatch,
@@ -46,6 +51,7 @@ export {
   warnMissingProviderGroupPolicyFallbackOnce,
   DEFAULT_ACCOUNT_ID,
 } from "openclaw/plugin-sdk/matrix";
+export type { HistoryEntry } from "openclaw/plugin-sdk/matrix";
 export { createAccountListHelpers } from "openclaw/plugin-sdk/account-helpers";
 export type {
   AllowlistMatch,
