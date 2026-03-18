@@ -1,6 +1,5 @@
 import {
-  createScopedAccountConfigAccessors,
-  createScopedChannelConfigBase,
+  createScopedChannelConfigAdapter,
   createScopedDmSecurityResolver,
   mapAllowFromEntries,
 } from "openclaw/plugin-sdk/channel-config-helpers";
@@ -35,6 +34,7 @@ import {
 } from "./accounts.js";
 import { zaloMessageActions } from "./actions.js";
 import { ZaloConfigSchema } from "./config-schema.js";
+import { resolveZaloOutboundSessionRoute } from "./session-route.js";
 import { zaloSetupAdapter } from "./setup-core.js";
 import { zaloSetupWizard } from "./setup-surface.js";
 import { collectZaloStatusIssues } from "./status-issues.js";
@@ -61,19 +61,15 @@ function normalizeZaloMessagingTarget(raw: string): string | undefined {
 
 const loadZaloChannelRuntime = createLazyRuntimeModule(() => import("./channel.runtime.js"));
 
-const zaloConfigAccessors = createScopedAccountConfigAccessors({
-  resolveAccount: ({ cfg, accountId }) => resolveZaloAccount({ cfg, accountId }),
-  resolveAllowFrom: (account: ResolvedZaloAccount) => account.config.allowFrom,
-  formatAllowFrom: (allowFrom) =>
-    formatAllowFromLowercase({ allowFrom, stripPrefixRe: /^(zalo|zl):/i }),
-});
-
-const zaloConfigBase = createScopedChannelConfigBase<ResolvedZaloAccount>({
+const zaloConfigAdapter = createScopedChannelConfigAdapter<ResolvedZaloAccount>({
   sectionKey: "zalo",
   listAccountIds: listZaloAccountIds,
   resolveAccount: (cfg, accountId) => resolveZaloAccount({ cfg, accountId }),
   defaultAccountId: resolveDefaultZaloAccountId,
   clearBaseFields: ["botToken", "tokenFile", "name"],
+  resolveAllowFrom: (account: ResolvedZaloAccount) => account.config.allowFrom,
+  formatAllowFrom: (allowFrom) =>
+    formatAllowFromLowercase({ allowFrom, stripPrefixRe: /^(zalo|zl):/i }),
 });
 
 const resolveZaloDmPolicy = createScopedDmSecurityResolver<ResolvedZaloAccount>({
@@ -101,7 +97,7 @@ export const zaloPlugin: ChannelPlugin<ResolvedZaloAccount> = {
   reload: { configPrefixes: ["channels.zalo"] },
   configSchema: buildChannelConfigSchema(ZaloConfigSchema),
   config: {
-    ...zaloConfigBase,
+    ...zaloConfigAdapter,
     isConfigured: (account) => Boolean(account.token?.trim()),
     describeAccount: (account): ChannelAccountSnapshot => ({
       accountId: account.accountId,
@@ -110,7 +106,6 @@ export const zaloPlugin: ChannelPlugin<ResolvedZaloAccount> = {
       configured: Boolean(account.token?.trim()),
       tokenSource: account.tokenSource,
     }),
-    ...zaloConfigAccessors,
   },
   security: {
     resolveDmPolicy: resolveZaloDmPolicy,
@@ -159,6 +154,7 @@ export const zaloPlugin: ChannelPlugin<ResolvedZaloAccount> = {
   actions: zaloMessageActions,
   messaging: {
     normalizeTarget: normalizeZaloMessagingTarget,
+    resolveOutboundSessionRoute: (params) => resolveZaloOutboundSessionRoute(params),
     targetResolver: {
       looksLikeId: isNumericTargetId,
       hint: "<chatId>",
