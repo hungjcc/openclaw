@@ -14,12 +14,13 @@ async function importFreshPluginTestModules() {
   vi.doUnmock("./hooks.js");
   vi.doUnmock("./loader.js");
   vi.doUnmock("jiti");
-  const [loader, hookRunnerGlobal, hooks, runtime, registry] = await Promise.all([
+  const [loader, hookRunnerGlobal, hooks, runtime, registry, promptSection] = await Promise.all([
     import("./loader.js"),
     import("./hook-runner-global.js"),
     import("./hooks.js"),
     import("./runtime.js"),
     import("./registry.js"),
+    import("../memory/prompt-section.js"),
   ]);
   return {
     ...loader,
@@ -27,11 +28,13 @@ async function importFreshPluginTestModules() {
     ...hooks,
     ...runtime,
     ...registry,
+    ...promptSection,
   };
 }
 
 const {
   __testing,
+  buildMemoryPromptSection,
   clearPluginLoaderCache,
   createHookRunner,
   createEmptyPluginRegistry,
@@ -39,6 +42,7 @@ const {
   getActivePluginRegistryKey,
   getGlobalHookRunner,
   loadOpenClawPlugins,
+  registerMemoryPromptSection,
   resetGlobalHookRunner,
   setActivePluginRegistry,
 } = await importFreshPluginTestModules();
@@ -3362,5 +3366,18 @@ module.exports = {
       env,
     });
     expect(resolved).toBe(expected === "dist" ? fixture.distFile : fixture.srcFile);
+  });
+});
+
+describe("clearPluginLoaderCache", () => {
+  it("resets the registered memory prompt section builder", () => {
+    registerMemoryPromptSection(() => ["stale memory section"]);
+    expect(buildMemoryPromptSection({ availableTools: new Set() })).toEqual([
+      "stale memory section",
+    ]);
+
+    clearPluginLoaderCache();
+
+    expect(buildMemoryPromptSection({ availableTools: new Set() })).toEqual([]);
   });
 });
