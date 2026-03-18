@@ -1,3 +1,4 @@
+import os from "node:os";
 import type {
   ChannelAccountSnapshot,
   ChatType,
@@ -86,9 +87,13 @@ import {
   DEFAULT_COMMAND_SPECS,
   cleanupSlashCommands,
   isSlashCommandsEnabled,
+  loadPersistedSlashCommands,
+  removePersistedSlashCommands,
   registerSlashCommands,
   resolveCallbackUrl,
+  resolveSlashCommandCachePath,
   resolveSlashCommandConfig,
+  savePersistedSlashCommands,
 } from "./slash-commands.js";
 import {
   activateSlashCommands,
@@ -389,9 +394,17 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
     | undefined;
   const slashConfig = resolveSlashCommandConfig(commandsRaw);
   const slashEnabled = isSlashCommandsEnabled(slashConfig);
+  let slashCommandCachePath: string | null = null;
 
   if (slashEnabled) {
     try {
+      slashCommandCachePath = resolveSlashCommandCachePath(
+        getMattermostRuntime().state.resolveStateDir(process.env, os.homedir),
+        account.accountId,
+      );
+      const cachedSlashCommands = slashCommandCachePath
+        ? await loadPersistedSlashCommands(slashCommandCachePath, (msg) => runtime.log?.(msg))
+        : [];
       const teams = await fetchMattermostUserTeams(client, botUserId);
 
       // Use the *runtime* listener port when available (e.g. `openclaw gateway run --port <port>`).
@@ -469,6 +482,7 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
             creatorUserId: botUserId,
             callbackUrl: slashCallbackUrl,
             commands: dedupedCommands,
+            cachedCommands: cachedSlashCommands,
             log: (msg) => runtime.log?.(msg),
           });
           allRegistered.push(...registered);
@@ -497,6 +511,12 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
           if (cmd.originalName) {
             triggerMap.set(cmd.trigger, cmd.originalName);
           }
+        }
+
+        if (slashCommandCachePath) {
+          await savePersistedSlashCommands(slashCommandCachePath, allRegistered, (msg) =>
+            runtime.log?.(msg),
+          );
         }
 
         activateSlashCommands({
@@ -1993,15 +2013,33 @@ export async function monitorMattermostProvider(opts: MonitorMattermostOpts = {}
       // Snapshot registered commands before deactivating state.
       // This listener may run concurrently with startup in a new process, so we keep
       // monitor shutdown alive until the remote cleanup completes.
-      const commands = getSlashCommandState(account.accountId)?.registeredCommands ?? [];
+      const slashState = getSlashCommandState(account.accountId);
+      const commands = slashState?.registeredCommands ?? [];
       // Deactivate state immediately to prevent new local dispatches during teardown.
       deactivateSlashCommands(account.accountId);
 
-      slashShutdownCleanup = cleanupSlashCommands({
-        client,
-        commands,
-        log: (msg) => runtime.log?.(msg),
-      }).catch((err) => {
+      slashShutdownCleanup = (async () => {
+        const remainingCommands = await cleanupSlashCommands({
+          client,
+          commands,
+          log: (msg) => runtime.log?.(msg),
+        });
+
+        // Only rewrite the cache when this process had active slash state.
+        // Failed startups should leave the last known good cache intact.
+        if (!slashState || !slashCommandCachePath) {
+          return;
+        }
+
+        if (remainingCommands.length > 0) {
+          await savePersistedSlashCommands(slashCommandCachePath, remainingCommands, (msg) =>
+            runtime.log?.(msg),
+          );
+          return;
+        }
+
+        await removePersistedSlashCommands(slashCommandCachePath, (msg) => runtime.log?.(msg));
+      })().catch((err) => {
         runtime.error?.(`mattermost: slash cleanup failed: ${String(err)}`);
       });
     };
