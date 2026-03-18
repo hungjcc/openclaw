@@ -361,7 +361,9 @@ describe("resolveMedia getFile retry", () => {
 });
 
 describe("resolveMedia original filename preservation", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ resolveMedia } = await import("./delivery.js"));
     vi.useFakeTimers();
     fetchRemoteMedia.mockClear();
     saveMediaBuffer.mockClear();
