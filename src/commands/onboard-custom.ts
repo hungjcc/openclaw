@@ -640,8 +640,8 @@ export function applyCustomApiConfig(params: ApplyCustomApiConfigParams): Custom
     ? existingModels.map((model) =>
         model.id === modelId
           ? {
-              ...nextModel,
               ...model,
+              ...nextModel,
               contextWindow: normalizeContextWindowForCustomModel(model.contextWindow),
             }
           : model,
