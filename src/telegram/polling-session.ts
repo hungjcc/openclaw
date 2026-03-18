@@ -1,4 +1,5 @@
 import { type RunOptions, run } from "@grammyjs/runner";
+import { createConnectedChannelStatusPatch } from "../gateway/channel-status-patches.js";
 import { computeBackoff, sleepWithAbort } from "../infra/backoff.js";
 import { formatErrorMessage } from "../infra/errors.js";
 import { formatDurationPrecise } from "../infra/format-time/format-duration.ts";
@@ -28,6 +29,8 @@ type TelegramPollingSessionOpts = {
   runnerOptions: RunOptions<unknown>;
   getLastUpdateId: () => number | null;
   persistUpdateId: (updateId: number) => Promise<void>;
+  getStatus?: () => Record<string, unknown>;
+  setStatus?: (next: Record<string, unknown>) => void;
   log: (line: string) => void;
 };
 
@@ -47,6 +50,34 @@ export class TelegramPollingSession {
 
   markForceRestarted() {
     this.#forceRestarted = true;
+  }
+
+  #publishConnectedStatus() {
+    this.opts.setStatus?.({
+      ...createConnectedChannelStatusPatch(Date.now()),
+      mode: "polling",
+      lastError: null,
+    });
+  }
+
+  #publishDisconnectedStatus(error?: unknown) {
+    const at = Date.now();
+    const message = error ? formatErrorMessage(error) : undefined;
+    this.opts.setStatus?.({
+      connected: false,
+      mode: "polling",
+      lastDisconnect: message ? { at, error: message } : { at },
+      lastError: message ?? null,
+    });
+  }
+
+  #publishInboundActivity() {
+    const at = Date.now();
+    this.opts.setStatus?.({
+      lastEventAt: at,
+      lastInboundAt: at,
+      lastError: null,
+    });
   }
 
   abortActiveFetch() {
@@ -116,7 +147,7 @@ export class TelegramPollingSession {
         fetchAbortSignal: fetchAbortController.signal,
         updateOffset: {
           lastUpdateId: this.opts.getLastUpdateId(),
-          onUpdateId: this.opts.persistUpdateId,
+          onUpdateId: (updateId) => this.persistUpdateId(updateId),
         },
       });
     } catch (err) {
@@ -173,6 +204,7 @@ export class TelegramPollingSession {
     });
 
     const runner = run(bot, this.opts.runnerOptions);
+    this.#publishConnectedStatus();
     this.#activeRunner = runner;
     const fetchAbortController = this.#activeFetchAbort;
     let stopPromise: Promise<void> | undefined;
@@ -206,6 +238,7 @@ export class TelegramPollingSession {
       const elapsed = Date.now() - lastGetUpdatesAt;
       if (elapsed > POLL_STALL_THRESHOLD_MS && runner.isRunning()) {
         stalledRestart = true;
+        this.#publishDisconnectedStatus(new Error("polling stall detected"));
         this.opts.log(
           `[telegram:${this.opts.accountId}] Polling stall detected (no getUpdates for ${formatDurationPrecise(elapsed)}); forcing restart.`,
         );
@@ -236,6 +269,7 @@ export class TelegramPollingSession {
       if (this.opts.abortSignal?.aborted) {
         throw err;
       }
+      this.#publishDisconnectedStatus(err);
       const isConflict = isGetUpdatesConflict(err);
       if (isConflict) {
         this.#webhookCleared = false;
@@ -260,6 +294,7 @@ export class TelegramPollingSession {
     } finally {
       clearInterval(watchdog);
       this.opts.abortSignal?.removeEventListener("abort", stopOnAbort);
+      this.#publishDisconnectedStatus();
       await stopRunner();
       await stopBot();
       this.#activeRunner = undefined;
@@ -267,6 +302,11 @@ export class TelegramPollingSession {
         this.#activeFetchAbort = undefined;
       }
     }
+  }
+
+  async persistUpdateId(updateId: number): Promise<void> {
+    await this.opts.persistUpdateId(updateId);
+    this.#publishInboundActivity();
   }
 }
 

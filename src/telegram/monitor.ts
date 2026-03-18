@@ -20,6 +20,8 @@ export type MonitorTelegramOpts = {
   config?: OpenClawConfig;
   runtime?: RuntimeEnv;
   abortSignal?: AbortSignal;
+  setStatus?: (next: Record<string, unknown>) => void;
+  getStatus?: () => Record<string, unknown>;
   useWebhook?: boolean;
   webhookPath?: string;
   webhookPort?: number;
@@ -160,7 +162,17 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
         publicUrl: opts.webhookUrl,
         webhookCertPath: opts.webhookCertPath,
       });
+      opts.setStatus?.({
+        connected: true,
+        lastConnectedAt: Date.now(),
+        lastError: null,
+        mode: "webhook",
+      });
       await waitForAbortSignal(opts.abortSignal);
+      opts.setStatus?.({
+        connected: false,
+        lastDisconnect: { at: Date.now() },
+      });
       return;
     }
 
@@ -174,6 +186,8 @@ export async function monitorTelegramProvider(opts: MonitorTelegramOpts = {}) {
       runnerOptions: createTelegramRunnerOptions(cfg),
       getLastUpdateId: () => lastUpdateId,
       persistUpdateId,
+      getStatus: opts.getStatus,
+      setStatus: opts.setStatus,
       log,
     });
     await pollingSession.runUntilAbort();

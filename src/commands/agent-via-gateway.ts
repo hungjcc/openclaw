@@ -21,6 +21,9 @@ type AgentGatewayResult = {
     mediaUrls?: string[];
   }>;
   meta?: unknown;
+  didSendViaMessagingTool?: boolean;
+  messagingToolSentTexts?: string[];
+  messagingToolSentMediaUrls?: string[];
 };
 
 type GatewayAgentResponse = {
@@ -37,6 +40,7 @@ export type AgentCliOpts = {
   agent?: string;
   to?: string;
   sessionId?: string;
+  sessionKey?: string;
   thinking?: string;
   verbose?: string;
   json?: boolean;
@@ -84,13 +88,23 @@ function formatPayloadForLog(payload: {
   return lines.join("\n").trimEnd();
 }
 
+function didDeliverViaMessagingTool(result?: AgentGatewayResult): boolean {
+  return Boolean(
+    result?.didSendViaMessagingTool ||
+    (result?.messagingToolSentTexts?.length ?? 0) > 0 ||
+    (result?.messagingToolSentMediaUrls?.length ?? 0) > 0,
+  );
+}
+
 export async function agentViaGatewayCommand(opts: AgentCliOpts, runtime: RuntimeEnv) {
   const body = (opts.message ?? "").trim();
   if (!body) {
     throw new Error("Message (--message) is required");
   }
-  if (!opts.to && !opts.sessionId && !opts.agent) {
-    throw new Error("Pass --to <E.164>, --session-id, or --agent to choose a session");
+  if (!opts.to && !opts.sessionId && !opts.sessionKey && !opts.agent) {
+    throw new Error(
+      "Pass --to <E.164>, --session-id, --session-key, or --agent to choose a session",
+    );
   }
 
   const cfg = loadConfig();
@@ -115,6 +129,7 @@ export async function agentViaGatewayCommand(opts: AgentCliOpts, runtime: Runtim
     agentId,
     to: opts.to,
     sessionId: opts.sessionId,
+    sessionKey: opts.sessionKey,
   }).sessionKey;
 
   const channel = normalizeMessageChannel(opts.channel);
@@ -135,7 +150,7 @@ export async function agentViaGatewayCommand(opts: AgentCliOpts, runtime: Runtim
           to: opts.to,
           replyTo: opts.replyTo,
           sessionId: opts.sessionId,
-          sessionKey,
+          sessionKey: opts.sessionKey ?? sessionKey,
           thinking: opts.thinking,
           deliver: Boolean(opts.deliver),
           channel,
@@ -163,7 +178,13 @@ export async function agentViaGatewayCommand(opts: AgentCliOpts, runtime: Runtim
   const payloads = result?.payloads ?? [];
 
   if (payloads.length === 0) {
-    runtime.log(response?.summary ? String(response.summary) : "No reply from agent.");
+    runtime.log(
+      response?.summary
+        ? String(response.summary)
+        : didDeliverViaMessagingTool(result)
+          ? "Reply delivered via messaging tool."
+          : "No reply from agent.",
+    );
     return response;
   }
 

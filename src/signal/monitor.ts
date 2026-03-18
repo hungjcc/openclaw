@@ -9,6 +9,7 @@ import {
   warnMissingProviderGroupPolicyFallbackOnce,
 } from "../config/runtime-group-policy.js";
 import type { SignalReactionNotificationMode } from "../config/types.js";
+import { createConnectedChannelStatusPatch } from "../gateway/channel-status-patches.js";
 import type { BackoffPolicy } from "../infra/backoff.js";
 import { waitForTransportReady } from "../infra/transport-ready.js";
 import { saveMediaBuffer } from "../media/store.js";
@@ -31,6 +32,8 @@ import { runSignalSseLoop } from "./sse-reconnect.js";
 export type MonitorSignalOpts = {
   runtime?: RuntimeEnv;
   abortSignal?: AbortSignal;
+  getStatus?: () => Record<string, unknown>;
+  setStatus?: (next: Record<string, unknown>) => void;
   account?: string;
   accountId?: string;
   config?: OpenClawConfig;
@@ -49,6 +52,54 @@ export type MonitorSignalOpts = {
   mediaMaxMb?: number;
   reconnectPolicy?: Partial<BackoffPolicy>;
 };
+
+function publishSignalConnectedStatus(
+  opts: Pick<MonitorSignalOpts, "setStatus">,
+  reconnectAttempts = 0,
+) {
+  opts.setStatus?.({
+    ...createConnectedChannelStatusPatch(Date.now()),
+    lastError: null,
+    reconnectAttempts,
+    mode: "sse",
+  });
+}
+
+function publishSignalDisconnectedStatus(
+  opts: Pick<MonitorSignalOpts, "setStatus">,
+  params: { error?: unknown; reconnectAttempts?: number } = {},
+) {
+  const at = Date.now();
+  const error =
+    params.error == null
+      ? undefined
+      : params.error instanceof Error
+        ? params.error.message
+        : JSON.stringify(params.error);
+  opts.setStatus?.({
+    connected: false,
+    lastEventAt: at,
+    lastDisconnect: {
+      at,
+      ...(error ? { error } : {}),
+    },
+    ...(error ? { lastError: error } : {}),
+    ...(typeof params.reconnectAttempts === "number"
+      ? { reconnectAttempts: params.reconnectAttempts }
+      : {}),
+    mode: "sse",
+  });
+}
+
+function publishSignalInboundActivity(opts: Pick<MonitorSignalOpts, "setStatus">) {
+  const at = Date.now();
+  opts.setStatus?.({
+    lastEventAt: at,
+    lastInboundAt: at,
+    lastError: null,
+    reconnectAttempts: 0,
+  });
+}
 
 function resolveRuntime(opts: MonitorSignalOpts): RuntimeEnv {
   return opts.runtime ?? createNonExitingRuntime();
@@ -416,6 +467,7 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
       if (daemonExitError) {
         throw daemonExitError;
       }
+      publishSignalConnectedStatus(opts);
     }
 
     const handleEvent = createSignalEventHandler({
@@ -452,8 +504,15 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
       account,
       abortSignal: daemonLifecycle.abortSignal,
       runtime,
+      onOpen: () => {
+        publishSignalConnectedStatus(opts);
+      },
+      onDisconnect: ({ error, reconnectAttempts }) => {
+        publishSignalDisconnectedStatus(opts, { error, reconnectAttempts });
+      },
       policy: opts.reconnectPolicy,
       onEvent: (event) => {
+        publishSignalInboundActivity(opts);
         void handleEvent(event).catch((err) => {
           runtime.error?.(`event handler failed: ${String(err)}`);
         });
@@ -468,10 +527,12 @@ export async function monitorSignalProvider(opts: MonitorSignalOpts = {}): Promi
     if (opts.abortSignal?.aborted && !daemonExitError) {
       return;
     }
+    publishSignalDisconnectedStatus(opts, { error: err });
     throw err;
   } finally {
     daemonLifecycle.dispose();
     opts.abortSignal?.removeEventListener("abort", onAbort);
     daemonLifecycle.stop();
+    publishSignalDisconnectedStatus(opts);
   }
 }

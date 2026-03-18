@@ -251,6 +251,33 @@ describe("resolveTelegramFetch", () => {
     expectEnvProxyAgentConstructorCall({ nth: 2, autoSelectFamily: false });
   });
 
+  it("keeps ipv4 fallback sticky across later bot recreation", async () => {
+    const timeoutErr = Object.assign(new Error("connect ETIMEDOUT 149.154.166.110:443"), {
+      code: "ETIMEDOUT",
+    });
+    const fetchError = Object.assign(new TypeError("fetch failed"), {
+      cause: timeoutErr,
+    });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(fetchError)
+      .mockResolvedValueOnce({ ok: true } as Response)
+      .mockResolvedValue({ ok: true } as Response);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const firstResolved = resolveTelegramFetchOrThrow();
+    await firstResolved("https://api.telegram.org/file/botx/photos/file_1.jpg");
+
+    resolveTelegramFetchOrThrow();
+
+    expect(setDefaultAutoSelectFamily).toHaveBeenCalledTimes(2);
+    expect(setDefaultAutoSelectFamily).toHaveBeenNthCalledWith(1, true);
+    expect(setDefaultAutoSelectFamily).toHaveBeenNthCalledWith(2, false);
+    expect(setGlobalDispatcher).toHaveBeenCalledTimes(2);
+    expectEnvProxyAgentConstructorCall({ nth: 1, autoSelectFamily: true });
+    expectEnvProxyAgentConstructorCall({ nth: 2, autoSelectFamily: false });
+  });
+
   it("retries with ipv4 fallback once per request, not once per process", async () => {
     const timeoutErr = Object.assign(new Error("connect ETIMEDOUT 149.154.166.110:443"), {
       code: "ETIMEDOUT",

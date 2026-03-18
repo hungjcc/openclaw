@@ -22,6 +22,17 @@ function createRecentSessionRow() {
 describe("redactSensitiveStatusSummary", () => {
   it("removes sensitive session and path details while preserving summary structure", () => {
     const input: StatusSummary = {
+      oagChannelHealth: {
+        congested: true,
+        backloggedAfterRecovery: false,
+        affectedChannels: ["telegram"],
+        pendingDeliveries: 3,
+        recentFailureCount: 4,
+        backlogAgeMinutes: 0,
+        escalationRecommended: false,
+        recommendedAction: "",
+        updatedAt: "2026-03-14T22:00:00+08:00",
+      },
       heartbeat: {
         defaultAgentId: "main",
         agents: [{ agentId: "main", enabled: true, every: "5m", everyMs: 300_000 }],
@@ -51,6 +62,7 @@ describe("redactSensitiveStatusSummary", () => {
     expect(redacted.sessions.byAgent[0]?.path).toBe("[redacted]");
     expect(redacted.sessions.byAgent[0]?.recent).toEqual([]);
     expect(redacted.heartbeat).toEqual(input.heartbeat);
+    expect(redacted.oagChannelHealth).toEqual(input.oagChannelHealth);
     expect(redacted.channelSummary).toEqual(input.channelSummary);
   });
 });

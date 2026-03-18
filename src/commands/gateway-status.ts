@@ -20,6 +20,12 @@ import {
   resolveTargets,
   sanitizeSshTarget,
 } from "./gateway-status/helpers.js";
+import {
+  formatOagChannelHealthLine,
+  formatOagSessionWatchLine,
+  formatOagTaskWatchLine,
+  readOagChannelHealthSummary,
+} from "./oag-channel-health.js";
 
 export async function gatewayStatusCommand(
   opts: {
@@ -44,6 +50,7 @@ export async function gatewayStatusCommand(
 
   const baseTargets = resolveTargets(cfg, opts.url);
   const network = buildNetworkHints(cfg);
+  const oagChannelHealth = await readOagChannelHealthSummary();
 
   const discoveryTimeoutMs = Math.min(1200, overallTimeoutMs);
   const discoveryPromise = discoverGatewayBeacons({
@@ -247,6 +254,7 @@ export async function gatewayStatusCommand(
           timeoutMs: overallTimeoutMs,
           primaryTargetId: primary?.target.id ?? null,
           warnings,
+          oagChannelHealth: oagChannelHealth ?? null,
           network,
           discovery: {
             timeoutMs: discoveryTimeoutMs,
@@ -303,6 +311,15 @@ export async function gatewayStatusCommand(
       : `${colorize(rich, theme.error, "Reachable")}: no`,
   );
   runtime.log(colorize(rich, theme.muted, `Probe budget: ${overallTimeoutMs}ms`));
+  runtime.log(
+    `${colorize(rich, theme.info, "OAG channels")}: ${formatOagChannelHealthLine(oagChannelHealth)}`,
+  );
+  runtime.log(
+    `${colorize(rich, theme.info, "OAG sessions")}: ${formatOagSessionWatchLine(oagChannelHealth)}`,
+  );
+  runtime.log(
+    `${colorize(rich, theme.info, "OAG tasks")}: ${formatOagTaskWatchLine(oagChannelHealth)}`,
+  );
 
   if (warnings.length > 0) {
     runtime.log("");
