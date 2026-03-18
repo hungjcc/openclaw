@@ -1,10 +1,34 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createCapturedPluginRegistration } from "../../test-utils/plugin-registration.js";
 import { createProviderUsageFetch, makeResponse } from "../../test-utils/provider-usage-fetch.js";
+import type { OpenClawPluginApi, ProviderPlugin } from "../types.js";
 import type { ProviderRuntimeModel } from "../types.js";
-import { requireProviderContractProvider } from "./registry.js";
+
+const getOAuthApiKeyMock = vi.hoisted(() => vi.fn());
+const refreshQwenPortalCredentialsMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@mariozechner/pi-ai/oauth", async () => {
+  const actual = await vi.importActual<object>("@mariozechner/pi-ai/oauth");
+  return {
+    ...actual,
+    getOAuthApiKey: getOAuthApiKeyMock,
+  };
+});
+
+vi.mock("openclaw/plugin-sdk/qwen-portal-auth", async () => {
+  const actual = await vi.importActual<object>("openclaw/plugin-sdk/qwen-portal-auth");
+  return {
+    ...actual,
+    refreshQwenPortalCredentials: refreshQwenPortalCredentialsMock,
+  };
+});
+
+let requireBundledProviderContractProvider: typeof import("./registry.js").requireProviderContractProvider;
+let openAIPlugin: (typeof import("../../../extensions/openai/index.js"))["default"];
+let qwenPortalPlugin: (typeof import("../../../extensions/qwen-portal-auth/index.js"))["default"];
 
 function createModel(overrides: Partial<ProviderRuntimeModel> & Pick<ProviderRuntimeModel, "id">) {
   return {
@@ -21,7 +45,43 @@ function createModel(overrides: Partial<ProviderRuntimeModel> & Pick<ProviderRun
   } satisfies ProviderRuntimeModel;
 }
 
+function registerProviders(...plugins: Array<{ register(api: OpenClawPluginApi): void }>) {
+  const captured = createCapturedPluginRegistration();
+  for (const plugin of plugins) {
+    plugin.register(captured.api);
+  }
+  return captured.providers;
+}
+
+function requireProvider(providers: ProviderPlugin[], providerId: string) {
+  const provider = providers.find((entry) => entry.id === providerId);
+  if (!provider) {
+    throw new Error(`provider ${providerId} missing`);
+  }
+  return provider;
+}
+
+function requireProviderContractProvider(providerId: string): ProviderPlugin {
+  if (providerId === "openai-codex") {
+    return requireProvider(registerProviders(openAIPlugin), providerId);
+  }
+  if (providerId === "qwen-portal") {
+    return requireProvider(registerProviders(qwenPortalPlugin), providerId);
+  }
+  return requireBundledProviderContractProvider(providerId);
+}
+
 describe("provider runtime contract", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ requireProviderContractProvider: requireBundledProviderContractProvider } =
+      await import("./registry.js"));
+    openAIPlugin = (await import("../../../extensions/openai/index.js")).default;
+    qwenPortalPlugin = (await import("../../../extensions/qwen-portal-auth/index.js")).default;
+    getOAuthApiKeyMock.mockReset();
+    refreshQwenPortalCredentialsMock.mockReset();
+  });
+
   describe("anthropic", () => {
     it("owns anthropic 4.6 forward-compat resolution", () => {
       const provider = requireProviderContractProvider("anthropic");
@@ -385,6 +445,9 @@ describe("provider runtime contract", () => {
         expires: Date.now() - 60_000,
       };
 
+      getOAuthApiKeyMock.mockReset();
+      getOAuthApiKeyMock.mockRejectedValueOnce(new Error("Failed to extract accountId from token"));
+
       await expect(provider.refreshOAuth?.(credential)).rejects.toThrow(
         /Failed to refresh OAuth token for openai-codex/,
       );
@@ -469,20 +532,7 @@ describe("provider runtime contract", () => {
   });
 
   describe("qwen-portal", () => {
-    afterEach(() => {
-      vi.unstubAllGlobals();
-    });
-
-    it("owns OAuth refresh error messaging", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: false,
-          status: 400,
-          text: async () => "invalid_grant",
-        }),
-      );
-
+    it("owns OAuth refresh", async () => {
       const provider = requireProviderContractProvider("qwen-portal");
       const credential = {
         type: "oauth" as const,
@@ -491,6 +541,35 @@ describe("provider runtime contract", () => {
         refresh: "refresh-token",
         expires: Date.now() - 60_000,
       };
+
+      const refreshed = {
+        ...credential,
+        access: "fresh-access-token",
+        expires: Date.now() + 60_000,
+      };
+
+      refreshQwenPortalCredentialsMock.mockReset();
+      refreshQwenPortalCredentialsMock.mockResolvedValueOnce(refreshed);
+
+      await expect(provider.refreshOAuth?.(credential)).resolves.toEqual(refreshed);
+    });
+
+    it("owns OAuth refresh error messaging", async () => {
+      const provider = requireProviderContractProvider("qwen-portal");
+      const credential = {
+        type: "oauth" as const,
+        provider: "qwen-portal",
+        access: "stale-access-token",
+        refresh: "refresh-token",
+        expires: Date.now() - 60_000,
+      };
+
+      refreshQwenPortalCredentialsMock.mockReset();
+      refreshQwenPortalCredentialsMock.mockRejectedValueOnce(
+        new Error(
+          "Qwen OAuth refresh token expired or invalid. Re-authenticate with `openclaw models auth login --provider qwen-portal`.",
+        ),
+      );
 
       await expect(provider.refreshOAuth?.(credential)).rejects.toThrow(
         /Re-authenticate with `openclaw models auth login --provider qwen-portal`/,

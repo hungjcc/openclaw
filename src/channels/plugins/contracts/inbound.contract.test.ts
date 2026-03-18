@@ -63,7 +63,7 @@ function createSlackMessage(overrides: Partial<SlackMessageEvent>): SlackMessage
 }
 
 describe("channel inbound contract", () => {
-  it("keeps Discord inbound context finalized", () => {
+  it("keeps Discord inbound context finalized", async () => {
     const ctx = finalizeInboundContext({
       Body: "Alice: hi",
       BodyForAgent: "hi",
@@ -75,7 +75,7 @@ describe("channel inbound contract", () => {
       SessionKey: "agent:main:discord:direct:u1",
       AccountId: "default",
       ChatType: "direct",
-      ConversationLabel: "Discord DM",
+      ConversationLabel: "Alice",
       SenderName: "Alice",
       SenderId: "U1",
       SenderUsername: "alice",
@@ -87,6 +87,7 @@ describe("channel inbound contract", () => {
       OriginatingTo: "channel:c1",
       CommandAuthorized: true,
     });
+
     expectChannelInboundContextContract(ctx);
   });
 
