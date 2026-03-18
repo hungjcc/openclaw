@@ -22,8 +22,8 @@ export type SearchConfigRecord = NonNullable<OpenClawConfig["tools"]>["web"] ext
     : Record<string, unknown>
   : Record<string, unknown>;
 
-export const DEFAULT_SEARCH_COUNT = 5;
-export const MAX_SEARCH_COUNT = 10;
+export const DEFAULT_SEARCH_COUNT = 10;
+export const MAX_SEARCH_COUNT = 20;
 
 const SEARCH_CACHE_KEY = Symbol.for("openclaw.web-search.cache");
 

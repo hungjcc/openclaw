@@ -843,6 +843,28 @@ const SECRET_TARGET_REGISTRY: SecretTargetRegistryEntry[] = [
     includeInConfigure: true,
     includeInAudit: true,
   },
+  {
+    id: "plugins.entries.firecrawl.config.webSearch.apiKey",
+    targetType: "plugins.entries.firecrawl.config.webSearch.apiKey",
+    configFile: "openclaw.json",
+    pathPattern: "plugins.entries.firecrawl.config.webSearch.apiKey",
+    secretShape: SECRET_INPUT_SHAPE,
+    expectedResolvedValue: "string",
+    includeInPlan: true,
+    includeInConfigure: true,
+    includeInAudit: true,
+  },
+  {
+    id: "plugins.entries.baidu.config.webSearch.apiKey",
+    targetType: "plugins.entries.baidu.config.webSearch.apiKey",
+    configFile: "openclaw.json",
+    pathPattern: "plugins.entries.baidu.config.webSearch.apiKey",
+    secretShape: SECRET_INPUT_SHAPE,
+    expectedResolvedValue: "string",
+    includeInPlan: true,
+    includeInConfigure: true,
+    includeInAudit: true,
+  },
 ];
 
 export { SECRET_TARGET_REGISTRY };
