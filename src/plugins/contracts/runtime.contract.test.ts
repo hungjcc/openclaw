@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createProviderUsageFetch, makeResponse } from "../../test-utils/provider-usage-fetch.js";
 import type { ProviderRuntimeModel } from "../types.js";
 import { requireProviderContractProvider } from "./registry.js";
@@ -469,7 +469,20 @@ describe("provider runtime contract", () => {
   });
 
   describe("qwen-portal", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
     it("owns OAuth refresh error messaging", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 400,
+          text: async () => "invalid_grant",
+        }),
+      );
+
       const provider = requireProviderContractProvider("qwen-portal");
       const credential = {
         type: "oauth" as const,
