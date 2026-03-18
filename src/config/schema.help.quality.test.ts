@@ -368,9 +368,6 @@ const TARGET_KEYS = [
   "agents.defaults.compaction",
   "agents.defaults.compaction.mode",
   "agents.defaults.compaction.provider",
-  "agents.defaults.compaction.morphApiUrl",
-  "agents.defaults.compaction.morphApiKey",
-  "agents.defaults.compaction.compressionRatio",
   "agents.defaults.compaction.reserveTokens",
   "agents.defaults.compaction.keepRecentTokens",
   "agents.defaults.compaction.reserveTokensFloor",
@@ -438,7 +435,6 @@ const ENUM_EXPECTATIONS: Record<string, string[]> = {
   "cli.banner.taglineMode": ['"random"', '"default"', '"off"'],
   "update.channel": ['"stable"', '"beta"', '"dev"'],
   "agents.defaults.compaction.mode": ['"default"', '"safeguard"'],
-  "agents.defaults.compaction.provider": ['"default"', '"morph"'],
   "agents.defaults.compaction.identifierPolicy": ['"strict"', '"off"', '"custom"'],
 };
 

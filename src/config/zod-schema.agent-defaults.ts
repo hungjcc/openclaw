@@ -11,10 +11,8 @@ import {
   BlockStreamingCoalesceSchema,
   CliBackendSchema,
   HumanDelaySchema,
-  SecretInputSchema,
   TypingModeSchema,
 } from "./zod-schema.core.js";
-import { sensitive } from "./zod-schema.sensitive.js";
 
 export const AgentDefaultsSchema = z
   .object({
@@ -86,23 +84,10 @@ export const AgentDefaultsSchema = z
       })
       .strict()
       .optional(),
-    codebaseSearch: z
-      .object({
-        enabled: z.boolean().optional(),
-        morphApiKey: SecretInputSchema.optional().register(sensitive),
-        morphApiUrl: z.string().optional(),
-        timeout: z.number().optional(),
-        excludes: z.array(z.string()).optional(),
-      })
-      .strict()
-      .optional(),
     compaction: z
       .object({
         mode: z.union([z.literal("default"), z.literal("safeguard")]).optional(),
-        provider: z.union([z.literal("default"), z.literal("morph")]).optional(),
-        morphApiUrl: z.string().optional(),
-        morphApiKey: z.string().optional(),
-        compressionRatio: z.number().min(0.05).max(1).optional(),
+        provider: z.string().optional(),
         reserveTokens: z.number().int().nonnegative().optional(),
         keepRecentTokens: z.number().int().positive().optional(),
         reserveTokensFloor: z.number().int().nonnegative().optional(),

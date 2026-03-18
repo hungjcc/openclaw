@@ -1,11 +1,9 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { stripToolResultDetails } from "../session-transcript-repair.js";
 import type { MorphCompactMessage } from "./types.js";
 
 const MAX_TOOL_RESULT_CHARS = 2000;
 
 /**
- * Extract text from an AgentMessage content field.
+ * Extract text from a message content field.
  * Content can be a plain string or an array of content blocks.
  */
 function extractContentText(content: unknown): string {
@@ -55,7 +53,7 @@ function safeJsonStringify(value: unknown): string {
 }
 
 /**
- * Map an AgentMessage role to a Morph-compatible role.
+ * Map a message role to a Morph-compatible role.
  * Morph only accepts "user" and "assistant".
  * toolResult messages are mapped to "user" (tool results are user-side in the Anthropic protocol).
  */
@@ -68,12 +66,36 @@ function mapRole(role: string): "user" | "assistant" {
 }
 
 /**
- * Serialize AgentMessage[] to Morph's compact message format.
- *
- * SECURITY: strips toolResult.details before serialization to avoid
- * leaking untrusted/verbose payloads into the compaction API.
+ * Strip toolResult details from messages to avoid leaking
+ * untrusted/verbose payloads into the compaction API.
  */
-export function serializeForMorph(messages: AgentMessage[]): MorphCompactMessage[] {
+function stripToolResultDetails(messages: unknown[]): unknown[] {
+  let touched = false;
+  const out: unknown[] = [];
+  for (const msg of messages) {
+    if (!msg || typeof msg !== "object" || (msg as { role?: unknown }).role !== "toolResult") {
+      out.push(msg);
+      continue;
+    }
+    const rec = msg as Record<string, unknown>;
+    if ("details" in rec) {
+      const { details: _, ...rest } = rec;
+      out.push(rest);
+      touched = true;
+    } else {
+      out.push(msg);
+    }
+  }
+  return touched ? out : messages;
+}
+
+/**
+ * Serialize messages to Morph's compact message format.
+ *
+ * Accepts unknown[] (as provided by the plugin compaction API)
+ * and extracts role/content from each message object.
+ */
+export function serializeForMorph(messages: unknown[]): MorphCompactMessage[] {
   // Strip toolResult details before serialization (security: untrusted payloads)
   const safeMessages = stripToolResultDetails(messages);
 
@@ -82,8 +104,14 @@ export function serializeForMorph(messages: AgentMessage[]): MorphCompactMessage
     if (!msg || typeof msg !== "object") {
       continue;
     }
-    const role = mapRole((msg as { role?: string } | undefined)?.role ?? "user");
-    const content = extractContentText((msg as { content?: unknown } | undefined)?.content);
+    const rawRole = (msg as { role?: string } | undefined)?.role ?? "user";
+    const role = mapRole(rawRole);
+    let content = extractContentText((msg as { content?: unknown } | undefined)?.content);
+    // Truncate top-level toolResult messages (extractContentText only truncates
+    // nested toolResult content blocks, not plain string content at message level)
+    if (rawRole === "toolResult" && content.length > MAX_TOOL_RESULT_CHARS) {
+      content = `${content.slice(0, MAX_TOOL_RESULT_CHARS)}...`;
+    }
     if (!content.trim()) {
       continue;
     }

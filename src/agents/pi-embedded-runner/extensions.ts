@@ -59,8 +59,8 @@ function buildContextPruningFactory(params: {
 
 function resolveCompactionMode(cfg?: OpenClawConfig): "default" | "safeguard" {
   const compaction = cfg?.agents?.defaults?.compaction;
-  // Morph provider requires the safeguard extension path
-  if (compaction?.provider === "morph") {
+  // A registered compaction provider requires the safeguard extension path
+  if (compaction?.provider) {
     return "safeguard";
   }
   return compaction?.mode === "safeguard" ? "safeguard" : "default";
@@ -94,9 +94,6 @@ export function buildEmbeddedExtensionFactories(params: {
       model: params.model,
       recentTurnsPreserve: compactionCfg?.recentTurnsPreserve,
       provider: compactionCfg?.provider,
-      morphApiUrl: compactionCfg?.morphApiUrl,
-      morphApiKey: compactionCfg?.morphApiKey,
-      compressionRatio: compactionCfg?.compressionRatio,
     });
     factories.push(compactionSafeguardExtension);
   }

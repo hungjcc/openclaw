@@ -77,27 +77,6 @@ export async function runNonInteractiveOnboardingLocal(params: {
 
   nextConfig = applyNonInteractiveSkillsConfig({ nextConfig, opts, runtime });
 
-  if (opts.morphApiKey && !opts.skipMorph) {
-    nextConfig = {
-      ...nextConfig,
-      agents: {
-        ...nextConfig.agents,
-        defaults: {
-          ...nextConfig.agents?.defaults,
-          compaction: {
-            ...nextConfig.agents?.defaults?.compaction,
-            provider: "morph" as const,
-            morphApiKey: opts.morphApiKey,
-          },
-          codebaseSearch: {
-            ...nextConfig.agents?.defaults?.codebaseSearch,
-            enabled: true,
-          },
-        },
-      },
-    };
-  }
-
   nextConfig = applyWizardMetadata(nextConfig, { command: "onboard", mode });
   await writeConfigFile(nextConfig);
   logConfigUpdated(runtime);

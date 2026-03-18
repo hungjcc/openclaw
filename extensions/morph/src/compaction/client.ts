@@ -1,10 +1,5 @@
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import { createSubsystemLogger } from "../../logging/subsystem.js";
-import { sleep } from "../../utils.js";
 import { serializeForMorph } from "./serialize.js";
 import type { MorphCompactConfig, MorphCompactResponse } from "./types.js";
-
-const log = createSubsystemLogger("compaction-morph");
 
 const MAX_ATTEMPTS = 4;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -37,17 +32,35 @@ function parseRetryAfterMs(headers: Headers): number | undefined {
   return undefined;
 }
 
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
+}
+
 /**
- * Summarize agent messages using the Morph compaction API.
+ * Summarize messages using the Morph compaction API.
  *
- * Returns the compressed summary string (same interface as `summarizeInStages`).
+ * Returns the compressed summary string.
  * Retries on 429/503 with exponential backoff.
  * Throws on unrecoverable errors (caller handles fallback).
  */
 export async function summarizeWithMorph(params: {
-  messages: AgentMessage[];
+  messages: unknown[];
   config: MorphCompactConfig;
-  signal: AbortSignal;
+  signal?: AbortSignal;
 }): Promise<string> {
   const { messages, config, signal } = params;
   const morphMessages = serializeForMorph(messages);
@@ -56,10 +69,17 @@ export async function summarizeWithMorph(params: {
     return "No prior history.";
   }
 
-  const url = `${config.apiUrl}/v1/compact`;
+  // Extract the latest user message as the query for relevance-based pruning.
+  // The Morph API uses query to score line relevance — explicit queries give
+  // tighter, more relevant compression than auto-detection.
+  const lastUserMsg = [...morphMessages].reverse().find((m) => m.role === "user");
+  const query = lastUserMsg?.content?.slice(0, 500);
+
+  const url = `${config.apiUrl.replace(/\/+$/, "")}/v1/compact`;
   const body = JSON.stringify({
     model: config.model,
     messages: morphMessages,
+    query,
     compression_ratio: config.compressionRatio,
     preserve_recent: 0,
     include_line_ranges: true,
@@ -69,14 +89,13 @@ export async function summarizeWithMorph(params: {
   const errors: Error[] = [];
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-    // Check abort before each attempt (covers race between retry iterations)
-    if (signal.aborted) {
+    // Check abort before each attempt
+    if (signal?.aborted) {
       throw signal.reason ?? new DOMException("Morph compaction aborted", "AbortError");
     }
 
-    // AbortSignal.any() correctly handles already-aborted signals
-    // and avoids the event listener race conditions of manual combining.
-    const combinedSignal = AbortSignal.any([signal, AbortSignal.timeout(config.timeout)]);
+    const timeoutSignal = AbortSignal.timeout(config.timeout);
+    const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
     try {
       const response = await fetch(url, {
@@ -94,10 +113,6 @@ export async function summarizeWithMorph(params: {
         if (typeof data.output !== "string" || !data.output.trim()) {
           throw new Error("Morph compaction returned empty or missing output");
         }
-        log.info(
-          `Morph compaction complete: ${data.usage?.input_tokens ?? "?"} input → ${data.usage?.output_tokens ?? "?"} output tokens ` +
-            `(${data.usage?.compression_ratio !== undefined ? (data.usage.compression_ratio * 100).toFixed(1) : "?"}% ratio, ${data.usage?.processing_time_ms ?? "?"}ms)`,
-        );
         return data.output;
       }
 
@@ -105,20 +120,18 @@ export async function summarizeWithMorph(params: {
         const retryAfterMs = parseRetryAfterMs(response.headers);
         const backoffMs =
           retryAfterMs ?? Math.min(INITIAL_RETRY_DELAY_MS * 2 ** attempt, MAX_RETRY_DELAY_MS);
-        log.warn(
-          `Morph compaction received ${response.status}; retrying in ${backoffMs}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`,
-        );
-        await sleep(backoffMs);
+        await sleep(backoffMs, signal);
         continue;
       }
 
-      // Non-retryable error
+      // Non-retryable error — fail immediately, do not retry
       const errorBody = await response.text().catch(() => "");
       const errorMsg = `Morph compaction failed with HTTP ${response.status}: ${errorBody}`.slice(
         0,
         500,
       );
-      throw new Error(errorMsg);
+      errors.push(new Error(errorMsg));
+      break;
     } catch (err) {
       if (
         err instanceof DOMException &&
@@ -131,16 +144,13 @@ export async function summarizeWithMorph(params: {
 
       if (attempt < MAX_ATTEMPTS - 1) {
         const backoffMs = Math.min(INITIAL_RETRY_DELAY_MS * 2 ** attempt, MAX_RETRY_DELAY_MS);
-        log.warn(
-          `Morph compaction error (attempt ${attempt + 1}/${MAX_ATTEMPTS}): ${error.message}; retrying in ${backoffMs}ms`,
-        );
-        await sleep(backoffMs);
+        await sleep(backoffMs, signal);
         continue;
       }
     }
   }
 
   throw new Error(
-    `Morph compaction failed after ${MAX_ATTEMPTS} attempts: ${errors.map((e) => e.message).join("; ")}`,
+    `Morph compaction failed after ${errors.length} attempt${errors.length === 1 ? "" : "s"}: ${errors.map((e) => e.message).join("; ")}`,
   );
 }

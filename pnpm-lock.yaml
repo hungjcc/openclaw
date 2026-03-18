@@ -69,9 +69,6 @@ importers:
       '@mariozechner/pi-tui':
         specifier: 0.57.1
         version: 0.57.1
-      '@morphllm/morphsdk':
-        specifier: ^0.2.143
-        version: 0.2.143(@anthropic-ai/sdk@0.73.0(zod@4.3.6))(ws@8.19.0)(zod@4.3.6)
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
@@ -418,6 +415,15 @@ importers:
         version: 6.27.0(ws@8.19.0)(zod@4.3.6)
 
   extensions/minimax-portal-auth: {}
+
+  extensions/morph:
+    dependencies:
+      '@morphllm/morphsdk':
+        specifier: ^0.2.143
+        version: 0.2.143(@anthropic-ai/sdk@0.73.0(zod@3.25.75))(ws@8.19.0)(zod@3.25.75)
+      '@sinclair/typebox':
+        specifier: 0.34.48
+        version: 0.34.48
 
   extensions/msteams:
     dependencies:
@@ -6758,6 +6764,13 @@ snapshots:
     dependencies:
       zod: 4.3.6
 
+  '@anthropic-ai/sdk@0.73.0(zod@3.25.75)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
+    optionalDependencies:
+      zod: 3.25.75
+    optional: true
+
   '@anthropic-ai/sdk@0.73.0(zod@4.3.6)':
     dependencies:
       json-schema-to-ts: 3.1.1
@@ -8440,15 +8453,15 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@morphllm/morphsdk@0.2.143(@anthropic-ai/sdk@0.73.0(zod@4.3.6))(ws@8.19.0)(zod@4.3.6)':
+  '@morphllm/morphsdk@0.2.143(@anthropic-ai/sdk@0.73.0(zod@3.25.75))(ws@8.19.0)(zod@3.25.75)':
     dependencies:
       '@vscode/ripgrep': 1.17.1
       diff: 7.0.0
       isomorphic-git: 1.37.4
-      openai: 4.104.0(ws@8.19.0)(zod@4.3.6)
+      openai: 4.104.0(ws@8.19.0)(zod@3.25.75)
     optionalDependencies:
-      '@anthropic-ai/sdk': 0.73.0(zod@4.3.6)
-      zod: 4.3.6
+      '@anthropic-ai/sdk': 0.73.0(zod@3.25.75)
+      zod: 3.25.75
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -12589,7 +12602,7 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
-  openai@4.104.0(ws@8.19.0)(zod@4.3.6):
+  openai@4.104.0(ws@8.19.0)(zod@3.25.75):
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -12600,7 +12613,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.19.0
-      zod: 4.3.6
+      zod: 3.25.75
     transitivePeerDependencies:
       - encoding
 

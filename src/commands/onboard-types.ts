@@ -160,8 +160,6 @@ export type OnboardOptions = {
   skipProviders?: boolean;
   skipSkills?: boolean;
   skipSearch?: boolean;
-  skipMorph?: boolean;
-  morphApiKey?: string;
   skipHealth?: boolean;
   skipUi?: boolean;
   nodeManager?: NodeManagerChoice;

@@ -9,7 +9,6 @@ import type { ToolFsPolicy } from "./tool-fs-policy.js";
 import { createAgentsListTool } from "./tools/agents-list-tool.js";
 import { createBrowserTool } from "./tools/browser-tool.js";
 import { createCanvasTool } from "./tools/canvas-tool.js";
-import { createCodebaseSearchTool } from "./tools/codebase-search-tool.js";
 import type { AnyAgentTool } from "./tools/common.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
@@ -110,10 +109,6 @@ export function createOpenClawTools(
         fsPolicy: options?.fsPolicy,
       })
     : null;
-  const codebaseSearchTool = createCodebaseSearchTool({
-    config: options?.config,
-    workspaceDir,
-  });
   const webSearchTool = createWebSearchTool({
     config: options?.config,
     sandboxed: options?.sandboxed,
@@ -206,7 +201,6 @@ export function createOpenClawTools(
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
     }),
-    ...(codebaseSearchTool ? [codebaseSearchTool] : []),
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(imageTool ? [imageTool] : []),

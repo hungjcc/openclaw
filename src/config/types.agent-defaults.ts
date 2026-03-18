@@ -6,7 +6,6 @@ import type {
   HumanDelayConfig,
   TypingMode,
 } from "./types.base.js";
-import type { SecretInput } from "./types.secrets.js";
 import type { MemorySearchConfig } from "./types.tools.js";
 
 export type AgentModelEntryConfig = {
@@ -170,8 +169,6 @@ export type AgentDefaultsConfig = {
   cliBackends?: Record<string, CliBackendConfig>;
   /** Opt-in: prune old tool results from the LLM context to reduce token usage. */
   contextPruning?: AgentContextPruningConfig;
-  /** Morph codebase search (WarpGrep) configuration. */
-  codebaseSearch?: AgentCodebaseSearchConfig;
   /** Compaction tuning and pre-compaction memory flush behavior. */
   compaction?: AgentCompactionConfig;
   /** Embedded Pi runner hardening and compatibility controls. */
@@ -289,19 +286,6 @@ export type AgentDefaultsConfig = {
   sandbox?: AgentSandboxConfig;
 };
 
-export type AgentCodebaseSearchConfig = {
-  /** Enable or disable the codebase_search tool. Default: enabled when API key is available. */
-  enabled?: boolean;
-  /** Morph API key for codebase search. Falls back to compaction.morphApiKey, then MORPH_API_KEY env var. */
-  morphApiKey?: SecretInput;
-  /** Morph API base URL for codebase search. */
-  morphApiUrl?: string;
-  /** Request timeout in milliseconds. */
-  timeout?: number;
-  /** Glob patterns to exclude from search. */
-  excludes?: string[];
-};
-
 export type AgentCompactionMode = "default" | "safeguard";
 export type AgentCompactionIdentifierPolicy = "strict" | "off" | "custom";
 export type AgentCompactionQualityGuardConfig = {
@@ -342,14 +326,12 @@ export type AgentCompactionConfig = {
    * When set, compaction uses this model instead of the agent's primary model.
    * Falls back to the primary model when unset. */
   model?: string;
-  /** Compaction provider ("default" uses LLM-based summarization, "morph" uses Morph's fast compaction API). */
-  provider?: "default" | "morph";
-  /** Morph API base URL (default: "https://api.morphllm.com"). Falls back to MORPH_API_URL env var. */
-  morphApiUrl?: string;
-  /** Morph API key. Falls back to MORPH_API_KEY env var. */
-  morphApiKey?: string;
-  /** Compression ratio for Morph compaction (0.05–1.0, default: 0.3). Lower = more compression. */
-  compressionRatio?: number;
+  /**
+   * Id of a registered compaction provider plugin.
+   * When set, the provider's summarize() is called instead of
+   * the built-in summarizeInStages(). Falls back to built-in on failure.
+   */
+  provider?: string;
 };
 
 export type AgentCompactionMemoryFlushConfig = {

@@ -56,39 +56,37 @@ When unset, compaction uses the agent's primary model.
 
 ## Morph fast compaction
 
-Morph provides a dedicated compaction API that compresses conversation context at 25k+ tokens per second with sub-300ms latency. When configured, OpenClaw uses Morph for compaction and automatically falls back to LLM summarization if the Morph API is unavailable.
+Morph provides a dedicated compaction API that compresses conversation context at 25k+ tokens per second with sub-300ms latency. It is available as a bundled plugin. When enabled, OpenClaw uses Morph for compaction and automatically falls back to LLM summarization if the Morph API is unavailable.
+
+To enable, set the compaction provider and enable the Morph plugin:
 
 ```json
 {
   "agents": {
     "defaults": {
       "compaction": {
-        "provider": "morph",
-        "morphApiKey": "morph-..."
+        "provider": "morph"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "morph": {
+        "enabled": true,
+        "config": {
+          "apiKey": "morph-..."
+        }
       }
     }
   }
 }
 ```
 
-You can also set the key via the `MORPH_API_KEY` environment variable instead of storing it in config.
+You can also set the key via the `MORPH_API_KEY` environment variable instead of storing it in plugin config.
 
-The `compressionRatio` setting (0.05-1.0, default 0.3) controls how aggressively context is compressed. Lower values produce shorter summaries:
+The `compressionRatio` plugin config (0.05-1.0, default 0.3) controls how aggressively context is compressed. Lower values produce shorter summaries.
 
-```json
-{
-  "agents": {
-    "defaults": {
-      "compaction": {
-        "provider": "morph",
-        "compressionRatio": 0.2
-      }
-    }
-  }
-}
-```
-
-Run `openclaw onboard` to set up Morph compaction interactively, or pass `--morph-api-key <key>` for non-interactive setup.
+Run `openclaw morph status` to check your Morph integration status.
 
 ## Auto-compaction (default on)
 

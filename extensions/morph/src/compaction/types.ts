@@ -9,6 +9,7 @@ export type MorphCompactResponseMessage = {
   content: string;
   name?: string | null;
   compacted_line_ranges: { start: number; end: number }[];
+  kept_line_ranges: { start: number; end: number }[];
 };
 
 export type MorphCompactUsage = {
