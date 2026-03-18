@@ -40,6 +40,7 @@ model as `provider/model`.
 - [Amazon Bedrock](/providers/bedrock)
 - [ERNIE (Baidu Wenxin)](/providers/ernie)
 - [Qianfan](/providers/qianfan)
+- [xAI](/providers/xai)
 
 For the full provider catalog (xAI, Groq, Mistral, etc.) and advanced configuration,
 see [Model providers](/concepts/model-providers).

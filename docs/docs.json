@@ -1059,6 +1059,7 @@
                   "plugins/zalouser",
                   "plugins/manifest",
                   "plugins/agent-tools",
+                  "tools/capability-cookbook",
                   "prose"
                 ]
               },
