@@ -43,18 +43,31 @@ export async function runPreHook(
           return;
         }
 
-        // maxBuffer exceeded is not a command failure — the hook ran fine,
-        // it just produced too much output. Treat based on exit code.
         const isMaxBuffer =
           (error as NodeJS.ErrnoException).code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+
+        // When maxBuffer is exceeded the exit code is unavailable from the error
+        // object (error.code is the string "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+        // not a numeric exit code, and error.status is absent). Treat as a hard
+        // error so that commands that exit 1 or 10 are never silently promoted
+        // to "proceed".
+        if (isMaxBuffer) {
+          resolve({
+            outcome: "error",
+            exitCode: 1,
+            stdout: String(stdout),
+            stderr: String(stderr),
+            message: "preHook output exceeded maxBuffer (64 KB)",
+          });
+          return;
+        }
 
         const exitCode =
           typeof error.code === "number"
             ? error.code
-            : ((error as NodeJS.ErrnoException & { status?: number }).status ??
-              (isMaxBuffer ? 0 : 1));
+            : ((error as NodeJS.ErrnoException & { status?: number }).status ?? 1);
 
-        if (error.killed && !isMaxBuffer) {
+        if (error.killed) {
           const reason = abortSignal?.aborted
             ? "aborted by job timeout"
             : `timed out after ${config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS}s`;
@@ -65,12 +78,6 @@ export async function runPreHook(
             stderr: String(stderr),
             message: reason,
           });
-          return;
-        }
-
-        // For maxBuffer with exit 0, treat as proceed.
-        if (isMaxBuffer && exitCode === 0) {
-          resolve({ outcome: "proceed" });
           return;
         }
 

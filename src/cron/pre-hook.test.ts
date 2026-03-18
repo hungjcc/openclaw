@@ -52,4 +52,15 @@ describe("runPreHook", () => {
       expect(result.message).toBe("exited with code 42");
     }
   });
+
+  it("returns error (not proceed) when output exceeds maxBuffer", async () => {
+    // Produces >64 KB stdout and exits 1 — must NOT be treated as proceed.
+    const result = await runPreHook({
+      command: "node -e 'process.stdout.write(\"x\".repeat(70000)); process.exit(1)'",
+    });
+    expect(result.outcome).toBe("error");
+    if (result.outcome === "error") {
+      expect(result.message).toContain("maxBuffer");
+    }
+  });
 });
