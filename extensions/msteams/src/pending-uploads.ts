@@ -65,6 +65,11 @@ export function getPendingUpload(id?: string): PendingUpload | undefined {
   // Check if expired (in case timeout hasn't fired yet)
   if (Date.now() - entry.createdAt > PENDING_UPLOAD_TTL_MS) {
     pendingUploads.delete(id);
+    const timer = pendingUploadTimers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      pendingUploadTimers.delete(id);
+    }
     return undefined;
   }
 
