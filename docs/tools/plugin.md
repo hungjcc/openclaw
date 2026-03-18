@@ -173,6 +173,28 @@ Direction:
 - prefer `before_prompt_build` for prompt mutation work
 - remove only after real usage drops and fixture coverage proves migration safety
 
+### Compatibility signals
+
+OpenClaw treats config validity and plugin migration state as separate axes:
+
+- **config valid** — the config parses and referenced plugins can be resolved
+- **compatibility advisory** — a plugin is still on a supported compatibility
+  path, such as `hook-only`
+- **legacy warning** — a plugin still uses `before_agent_start`
+- **hard error** — the config is invalid or plugin loading/validation fails
+
+Current compatibility guidance:
+
+- `hook-only` is advisory only. It remains a supported compatibility path for
+  existing plugins.
+- `before_agent_start` is the only strong migration warning in the current
+  model.
+- Neither state blocks an existing plugin by itself.
+
+You can see these signals in `openclaw doctor`, `openclaw status`,
+`openclaw status --all`, `openclaw plugins doctor`, and
+`openclaw plugins inspect <id>`.
+
 ## Architecture
 
 OpenClaw's plugin system has four layers:
@@ -1809,6 +1831,36 @@ export default function (api) {
   }));
 }
 ```
+
+If your engine does **not** own the compaction algorithm, keep `compact()`
+implemented and delegate it explicitly:
+
+```ts
+import { delegateCompactionToRuntime } from "openclaw/plugin-sdk/core";
+
+export default function (api) {
+  api.registerContextEngine("my-memory-engine", () => ({
+    info: {
+      id: "my-memory-engine",
+      name: "My Memory Engine",
+      ownsCompaction: false,
+    },
+    async ingest() {
+      return { ingested: true };
+    },
+    async assemble({ messages }) {
+      return { messages, estimatedTokens: 0 };
+    },
+    async compact(params) {
+      return await delegateCompactionToRuntime(params);
+    },
+  }));
+}
+```
+
+`ownsCompaction: false` does not automatically fall back to legacy compaction.
+If your engine is active, its `compact()` method still handles `/compact` and
+overflow recovery.
 
 Then enable it in config:
 
