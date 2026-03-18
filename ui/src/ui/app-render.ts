@@ -301,6 +301,11 @@ export function renderApp(state: AppViewState) {
     `;
   }
 
+  // Wire /new session switch once at init so it works regardless of current tab (not in render path).
+  if (!state.onSwitchToSession) {
+    state.onSwitchToSession = (key: string) => switchChatSession(state, key);
+  }
+
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
@@ -1406,7 +1411,7 @@ export function renderApp(state: AppViewState) {
                 canAbort: Boolean(state.chatRunId),
                 onAbort: () => void state.handleAbortChat(),
                 onQueueRemove: (id) => state.removeQueuedMessage(id),
-                onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
+                onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }), // /new creates new session and switches; old session is not reset
                 onClearHistory: async () => {
                   if (!state.client || !state.connected) {
                     return;

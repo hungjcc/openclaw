@@ -377,6 +377,9 @@ export type SessionSystemPromptReport = {
   };
 };
 
+// Default reset triggers are used by inbound channel/session logic (auto-reply session state).
+// Keep /new enabled by default for backward compatibility while UI + gateway agent treat /new
+// as "spawn a new session key" (#49517).
 export const DEFAULT_RESET_TRIGGER = "/new";
 export const DEFAULT_RESET_TRIGGERS = ["/new", "/reset"];
 export const DEFAULT_IDLE_MINUTES = 60;

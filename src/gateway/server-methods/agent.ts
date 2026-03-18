@@ -22,7 +22,11 @@ import {
   resolveAgentOutboundTarget,
 } from "../../infra/outbound/agent-delivery.js";
 import { resolveMessageChannelSelection } from "../../infra/outbound/channel-selection.js";
-import { classifySessionKeyShape, normalizeAgentId } from "../../routing/session-key.js";
+import {
+  buildAgentMainSessionKey,
+  classifySessionKeyShape,
+  normalizeAgentId,
+} from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
 import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
@@ -64,7 +68,8 @@ import {
 import { normalizeRpcAttachmentsToChatAttachments } from "./attachment-normalize.js";
 import type { GatewayRequestHandlerOptions, GatewayRequestHandlers } from "./types.js";
 
-const RESET_COMMAND_RE = /^\/(new|reset)(?:\s+([\s\S]*))?$/i;
+const RESET_COMMAND_RE = /^\/(reset)(?:\s+([\s\S]*))?$/i;
+const NEW_SESSION_COMMAND_RE = /^\/(new)(?:\s+([\s\S]*))?$/i;
 
 function resolveSenderIsOwnerFromClient(client: GatewayRequestHandlerOptions["client"]): boolean {
   const scopes = Array.isArray(client?.connect?.scopes) ? client.connect.scopes : [];
@@ -331,17 +336,18 @@ export const agentHandlers: GatewayRequestHandlers = {
     }
     let resolvedSessionId = request.sessionId?.trim() || undefined;
     let sessionEntry: SessionEntry | undefined;
+    let carryOverEntryForNewSession: SessionEntry | undefined;
     let bestEffortDeliver = requestedBestEffortDeliver ?? false;
     let cfgForAgent: ReturnType<typeof loadConfig> | undefined;
     let resolvedSessionKey = requestedSessionKey;
     let skipTimestampInjection = false;
 
+    // Only /reset clears the current session; /new spawns a new session without resetting the old one (#49517).
     const resetCommandMatch = message.match(RESET_COMMAND_RE);
     if (resetCommandMatch && requestedSessionKey) {
-      const resetReason = resetCommandMatch[1]?.toLowerCase() === "new" ? "new" : "reset";
       const resetResult = await runSessionResetFromAgent({
         key: requestedSessionKey,
-        reason: resetReason,
+        reason: "reset",
       });
       if (!resetResult.ok) {
         respond(false, undefined, resetResult.error);
@@ -353,12 +359,32 @@ export const agentHandlers: GatewayRequestHandlers = {
       if (postResetMessage) {
         message = postResetMessage;
       } else {
-        // Keep bare /new and /reset behavior aligned with chat.send:
-        // reset first, then run a fresh-session greeting prompt in-place.
-        // Date is embedded in the prompt so agents read the correct daily
-        // memory files; skip further timestamp injection to avoid duplication.
         message = buildBareSessionResetPrompt(cfg);
         skipTimestampInjection = true;
+      }
+    } else {
+      const newSessionMatch = message.match(NEW_SESSION_COMMAND_RE);
+      if (newSessionMatch && requestedSessionKey) {
+        // Spawn a new session (old one is left intact); run greeting or trailing text in the new session.
+        // Preserve routing context (lastChannel/lastTo/lastAccountId/deliveryContext) so deliver:true
+        // requests keep replying into the same channel unless explicitly overridden.
+        try {
+          carryOverEntryForNewSession = loadSessionEntry(requestedSessionKey)?.entry;
+        } catch {
+          carryOverEntryForNewSession = undefined;
+        }
+        const agentId = resolveAgentIdFromSessionKey(requestedSessionKey);
+        requestedSessionKey = buildAgentMainSessionKey({
+          agentId,
+          mainKey: `main-${randomUUID()}`,
+        });
+        const postNewMessage = newSessionMatch[2]?.trim() ?? "";
+        if (postNewMessage) {
+          message = postNewMessage;
+        } else {
+          message = buildBareSessionResetPrompt(cfg);
+          skipTimestampInjection = true;
+        }
       }
     }
 
@@ -375,9 +401,10 @@ export const agentHandlers: GatewayRequestHandlers = {
       cfgForAgent = cfg;
       const now = Date.now();
       const sessionId = entry?.sessionId ?? randomUUID();
-      const labelValue = request.label?.trim() || entry?.label;
+      const baseEntry = entry ?? carryOverEntryForNewSession;
+      const labelValue = request.label?.trim() || baseEntry?.label;
       const sessionAgent = resolveAgentIdFromSessionKey(canonicalKey);
-      spawnedByValue = canonicalizeSpawnedByForAgent(cfg, sessionAgent, entry?.spawnedBy);
+      spawnedByValue = canonicalizeSpawnedByForAgent(cfg, sessionAgent, baseEntry?.spawnedBy);
       let inheritedGroup:
         | { groupId?: string; groupChannel?: string; groupSpace?: string }
         | undefined;
@@ -396,33 +423,33 @@ export const agentHandlers: GatewayRequestHandlers = {
       resolvedGroupId = resolvedGroupId || inheritedGroup?.groupId;
       resolvedGroupChannel = resolvedGroupChannel || inheritedGroup?.groupChannel;
       resolvedGroupSpace = resolvedGroupSpace || inheritedGroup?.groupSpace;
-      const deliveryFields = normalizeSessionDeliveryFields(entry);
+      const deliveryFields = normalizeSessionDeliveryFields(baseEntry);
       const nextEntryPatch: SessionEntry = {
         sessionId,
         updatedAt: now,
-        thinkingLevel: entry?.thinkingLevel,
-        fastMode: entry?.fastMode,
-        verboseLevel: entry?.verboseLevel,
-        reasoningLevel: entry?.reasoningLevel,
-        systemSent: entry?.systemSent,
-        sendPolicy: entry?.sendPolicy,
-        skillsSnapshot: entry?.skillsSnapshot,
+        thinkingLevel: baseEntry?.thinkingLevel,
+        fastMode: baseEntry?.fastMode,
+        verboseLevel: baseEntry?.verboseLevel,
+        reasoningLevel: baseEntry?.reasoningLevel,
+        systemSent: baseEntry?.systemSent,
+        sendPolicy: baseEntry?.sendPolicy,
+        skillsSnapshot: baseEntry?.skillsSnapshot,
         deliveryContext: deliveryFields.deliveryContext,
-        lastChannel: deliveryFields.lastChannel ?? entry?.lastChannel,
-        lastTo: deliveryFields.lastTo ?? entry?.lastTo,
-        lastAccountId: deliveryFields.lastAccountId ?? entry?.lastAccountId,
-        modelOverride: entry?.modelOverride,
-        providerOverride: entry?.providerOverride,
+        lastChannel: deliveryFields.lastChannel ?? baseEntry?.lastChannel,
+        lastTo: deliveryFields.lastTo ?? baseEntry?.lastTo,
+        lastAccountId: deliveryFields.lastAccountId ?? baseEntry?.lastAccountId,
+        modelOverride: baseEntry?.modelOverride,
+        providerOverride: baseEntry?.providerOverride,
         label: labelValue,
         spawnedBy: spawnedByValue,
-        spawnedWorkspaceDir: entry?.spawnedWorkspaceDir,
-        spawnDepth: entry?.spawnDepth,
-        channel: entry?.channel ?? request.channel?.trim(),
-        groupId: resolvedGroupId ?? entry?.groupId,
-        groupChannel: resolvedGroupChannel ?? entry?.groupChannel,
-        space: resolvedGroupSpace ?? entry?.space,
-        cliSessionIds: entry?.cliSessionIds,
-        claudeCliSessionId: entry?.claudeCliSessionId,
+        spawnedWorkspaceDir: baseEntry?.spawnedWorkspaceDir,
+        spawnDepth: baseEntry?.spawnDepth,
+        channel: baseEntry?.channel ?? request.channel?.trim(),
+        groupId: resolvedGroupId ?? baseEntry?.groupId,
+        groupChannel: resolvedGroupChannel ?? baseEntry?.groupChannel,
+        space: resolvedGroupSpace ?? baseEntry?.space,
+        cliSessionIds: baseEntry?.cliSessionIds,
+        claudeCliSessionId: baseEntry?.claudeCliSessionId,
       };
       sessionEntry = mergeSessionEntry(entry, nextEntryPatch);
       const sendPolicy = resolveSendPolicy({
