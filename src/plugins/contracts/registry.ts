@@ -98,22 +98,25 @@ const staticBundledProviderPlugins: RegistrablePlugin[] = [
 ];
 
 function buildStaticProviderEntries(): ProviderContractEntry[] {
-  return staticBundledProviderPlugins.flatMap((plugin) => {
-    const captured = capturePluginRegistration(plugin);
-    return captured.providers.map((provider) => ({ pluginId: plugin.id, provider }));
-  });
+  // Process each plugin individually so one register() failure does not wipe out the rest.
+  const entries: ProviderContractEntry[] = [];
+  for (const plugin of staticBundledProviderPlugins) {
+    try {
+      const captured = capturePluginRegistration(plugin);
+      for (const provider of captured.providers) {
+        entries.push({ pluginId: plugin.id, provider });
+      }
+    } catch {
+      // Skip this plugin; absent providers may still be loaded by the jiti supplement path.
+    }
+  }
+  return entries;
 }
 
 function loadBundledProviderRegistry(): ProviderContractEntry[] {
   // Start with statically-imported providers (reliable in all vitest pool modes).
-  // Wrapped in try so a plugin register() failure degrades gracefully.
-  let staticEntries: ProviderContractEntry[] = [];
-  try {
-    staticEntries = buildStaticProviderEntries();
-  } catch (error) {
-    providerContractLoadError = error instanceof Error ? error : new Error(String(error));
-    return staticEntries;
-  }
+  // Individual register() failures are isolated inside buildStaticProviderEntries.
+  const staticEntries = buildStaticProviderEntries();
   const staticPluginIdSet = new Set(staticBundledProviderPlugins.map((p) => p.id));
 
   // Supplement with jiti-loaded providers for the ~23 bundled plugins not in
