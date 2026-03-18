@@ -255,6 +255,8 @@ describe("acquireSessionWriteLock", () => {
         JSON.stringify({
           pid: process.pid,
           createdAt: new Date(nowMs - 1_000).toISOString(),
+          // Include starttime so this lock is not treated as orphan
+          starttime: FAKE_STARTTIME,
         }),
         "utf8",
       );
@@ -276,6 +278,46 @@ describe("acquireSessionWriteLock", () => {
       await expect(fs.access(staleDeadLock)).rejects.toThrow();
       await expect(fs.access(staleAliveLock)).rejects.toThrow();
       await expect(fs.access(freshAliveLock)).resolves.toBeUndefined();
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("cleans orphan self-lock files during cleanup even when timestamp is fresh", async () => {
+    // This test covers the case where the gateway process lost in-memory
+    // HELD_LOCKS state but the lock file still references the current PID
+    // with a fresh timestamp. At startup, HELD_LOCKS is empty, so any lock
+    // owned by the current PID should be treated as orphaned.
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-orphan-self-"));
+    const sessionsDir = path.join(root, "sessions");
+    await fs.mkdir(sessionsDir, { recursive: true });
+
+    const nowMs = Date.now();
+    // Fresh timestamp (only 1 second old), but not in HELD_LOCKS
+    const orphanSelfLock = path.join(sessionsDir, "orphan-self.jsonl.lock");
+
+    try {
+      await fs.writeFile(
+        orphanSelfLock,
+        JSON.stringify({
+          pid: process.pid,
+          createdAt: new Date(nowMs - 1_000).toISOString(),
+          // Note: no starttime field, which makes shouldTreatAsOrphanSelfLock return true
+        }),
+        "utf8",
+      );
+
+      const result = await cleanStaleLockFiles({
+        sessionsDir,
+        staleMs: 30_000, // 30 seconds - the lock is only 1 second old
+        nowMs,
+        removeStale: true,
+      });
+
+      expect(result.locks).toHaveLength(1);
+      expect(result.cleaned).toHaveLength(1);
+      expect(result.cleaned[0].staleReasons).toContain("orphan-self-pid");
+      await expect(fs.access(orphanSelfLock)).rejects.toThrow();
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
@@ -397,4 +439,46 @@ describe("acquireSessionWriteLock", () => {
     expect(process.listeners("SIGINT")).toContain(keepAlive);
     process.off("SIGINT", keepAlive);
   });
+});
+
+it("cleans orphan self-lock files with matching starttime (Linux-realistic scenario)", async () => {
+  // This test covers the Linux-realistic scenario where the lock file has a
+  // valid starttime that matches the current process. On Linux, getProcessStartTime
+  // always returns a value, so every lock file will have starttime set.
+  // The fix must detect these as orphans by comparing starttime values.
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-orphan-starttime-"));
+  const sessionsDir = path.join(root, "sessions");
+  await fs.mkdir(sessionsDir, { recursive: true });
+
+  const nowMs = Date.now();
+  const orphanWithStarttime = path.join(sessionsDir, "orphan-with-starttime.jsonl.lock");
+
+  try {
+    await fs.writeFile(
+      orphanWithStarttime,
+      JSON.stringify({
+        pid: process.pid,
+        createdAt: new Date(nowMs - 1_000).toISOString(),
+        // Include starttime matching the current process (via mock: FAKE_STARTTIME = 12345)
+        // This simulates a Linux environment where starttime is always written.
+        starttime: 12345,
+      }),
+      "utf8",
+    );
+
+    const result = await cleanStaleLockFiles({
+      sessionsDir,
+      staleMs: 30_000, // 30 seconds - the lock is only 1 second old
+      nowMs,
+      removeStale: true,
+    });
+
+    // Should still be cleaned because it's not in HELD_LOCKS
+    expect(result.locks).toHaveLength(1);
+    expect(result.cleaned).toHaveLength(1);
+    expect(result.cleaned[0].staleReasons).toContain("orphan-self-pid");
+    await expect(fs.access(orphanWithStarttime)).rejects.toThrow();
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
