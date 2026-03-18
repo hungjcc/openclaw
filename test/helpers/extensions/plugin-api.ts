@@ -23,6 +23,7 @@ export function createTestPluginApi(api: TestPluginApiInput): OpenClawPluginApi 
     onConversationBindingResolved() {},
     registerCommand() {},
     registerContextEngine() {},
+    registerDispatchInterceptor() {},
     resolvePath(input: string) {
       return input;
     },

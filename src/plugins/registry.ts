@@ -51,6 +51,7 @@ import type {
   PluginHookName,
   PluginHookHandlerMap,
   PluginHookRegistration as TypedPluginHookRegistration,
+  DispatchInterceptorPlugin,
   SpeechProviderPlugin,
   WebSearchProviderPlugin,
 } from "./types.js";
@@ -210,6 +211,7 @@ export type PluginRegistry = {
   cliRegistrars: PluginCliRegistration[];
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
+  dispatchInterceptors: DispatchInterceptorPlugin[];
   conversationBindingResolvedHandlers: PluginConversationBindingResolvedHandlerRegistration[];
   diagnostics: PluginDiagnostic[];
 };
@@ -979,6 +981,12 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
           });
         }
       },
+      registerDispatchInterceptor:
+        registrationMode === "full"
+          ? (interceptor) => {
+              registry.dispatchInterceptors.push(interceptor);
+            }
+          : () => {},
       resolvePath: (input: string) => resolveUserPath(input),
       on: (hookName, handler, opts) =>
         registrationMode === "full"

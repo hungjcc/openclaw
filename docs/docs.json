@@ -1043,6 +1043,7 @@
                   "plugins/zalouser",
                   "plugins/manifest",
                   "plugins/agent-tools",
+                  "plugins/dispatch-interceptor",
                   "tools/capability-cookbook",
                   "prose"
                 ]
