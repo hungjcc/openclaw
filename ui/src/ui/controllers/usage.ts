@@ -7,6 +7,7 @@ export type UsageState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
   usageLoading: boolean;
+  usageRequestVersion: number;
   usageResult: SessionsUsageResult | null;
   usageCostSummary: CostUsageSummary | null;
   usageError: string | null;
@@ -20,6 +21,8 @@ export type UsageState = {
   usageTimeSeriesCursorEnd: number | null;
   usageSessionLogs: SessionLogEntry[] | null;
   usageSessionLogsLoading: boolean;
+  usageTimeSeriesRequestVersion: number;
+  usageSessionLogsRequestVersion: number;
   usageTimeZone: "local" | "utc";
   settings?: { gatewayUrl?: string };
 };
@@ -188,17 +191,17 @@ export async function loadUsage(
   if (!client || !state.connected) {
     return;
   }
-  if (state.usageLoading) {
-    return;
-  }
+  const requestVersion = bumpRequestVersion(state.usageRequestVersion);
+  state.usageRequestVersion = requestVersion;
   state.usageLoading = true;
   state.usageError = null;
   try {
     const startDate = overrides?.startDate ?? state.usageStartDate;
     const endDate = overrides?.endDate ?? state.usageEndDate;
+    const usageTimeZone = state.usageTimeZone;
     const runUsageRequests = async (includeDateInterpretation: boolean) => {
       const dateInterpretation = buildDateInterpretationParams(
-        state.usageTimeZone,
+        usageTimeZone,
         includeDateInterpretation,
       );
       return await Promise.all([
@@ -218,6 +221,9 @@ export async function loadUsage(
     };
 
     const applyUsageResults = (sessionsRes: unknown, costRes: unknown) => {
+      if (state.usageRequestVersion !== requestVersion) {
+        return;
+      }
       if (sessionsRes) {
         state.usageResult = sessionsRes as SessionsUsageResult;
       }
@@ -242,9 +248,13 @@ export async function loadUsage(
       }
     }
   } catch (err) {
-    state.usageError = toErrorMessage(err);
+    if (state.usageRequestVersion === requestVersion) {
+      state.usageError = toErrorMessage(err);
+    }
   } finally {
-    state.usageLoading = false;
+    if (state.usageRequestVersion === requestVersion) {
+      state.usageLoading = false;
+    }
   }
 }
 
@@ -261,49 +271,76 @@ export const __test = {
   },
 };
 
+function bumpRequestVersion(value: number | undefined): number {
+  return Number.isFinite(value) ? value + 1 : 1;
+}
+
+export function resetSessionUsageDetails(state: UsageState) {
+  state.usageTimeSeriesRequestVersion = bumpRequestVersion(state.usageTimeSeriesRequestVersion);
+  state.usageSessionLogsRequestVersion = bumpRequestVersion(state.usageSessionLogsRequestVersion);
+  state.usageTimeSeriesLoading = false;
+  state.usageSessionLogsLoading = false;
+  state.usageTimeSeries = null;
+  state.usageSessionLogs = null;
+}
+
 export async function loadSessionTimeSeries(state: UsageState, sessionKey: string) {
-  if (!state.client || !state.connected) {
+  const client = state.client;
+  if (!client || !state.connected) {
     return;
   }
-  if (state.usageTimeSeriesLoading) {
-    return;
-  }
+  const requestVersion = bumpRequestVersion(state.usageTimeSeriesRequestVersion);
+  state.usageTimeSeriesRequestVersion = requestVersion;
   state.usageTimeSeriesLoading = true;
   state.usageTimeSeries = null;
   try {
-    const res = await state.client.request("sessions.usage.timeseries", { key: sessionKey });
+    const res = await client.request("sessions.usage.timeseries", { key: sessionKey });
+    if (state.usageTimeSeriesRequestVersion !== requestVersion) {
+      return;
+    }
     if (res) {
       state.usageTimeSeries = res as SessionUsageTimeSeries;
     }
   } catch {
     // Silently fail - time series is optional
-    state.usageTimeSeries = null;
+    if (state.usageTimeSeriesRequestVersion === requestVersion) {
+      state.usageTimeSeries = null;
+    }
   } finally {
-    state.usageTimeSeriesLoading = false;
+    if (state.usageTimeSeriesRequestVersion === requestVersion) {
+      state.usageTimeSeriesLoading = false;
+    }
   }
 }
 
 export async function loadSessionLogs(state: UsageState, sessionKey: string) {
-  if (!state.client || !state.connected) {
+  const client = state.client;
+  if (!client || !state.connected) {
     return;
   }
-  if (state.usageSessionLogsLoading) {
-    return;
-  }
+  const requestVersion = bumpRequestVersion(state.usageSessionLogsRequestVersion);
+  state.usageSessionLogsRequestVersion = requestVersion;
   state.usageSessionLogsLoading = true;
   state.usageSessionLogs = null;
   try {
-    const res = await state.client.request("sessions.usage.logs", {
+    const res = await client.request("sessions.usage.logs", {
       key: sessionKey,
       limit: 1000,
     });
+    if (state.usageSessionLogsRequestVersion !== requestVersion) {
+      return;
+    }
     if (res && Array.isArray((res as { logs: SessionLogEntry[] }).logs)) {
       state.usageSessionLogs = (res as { logs: SessionLogEntry[] }).logs;
     }
   } catch {
     // Silently fail - logs are optional
-    state.usageSessionLogs = null;
+    if (state.usageSessionLogsRequestVersion === requestVersion) {
+      state.usageSessionLogs = null;
+    }
   } finally {
-    state.usageSessionLogsLoading = false;
+    if (state.usageSessionLogsRequestVersion === requestVersion) {
+      state.usageSessionLogsLoading = false;
+    }
   }
 }

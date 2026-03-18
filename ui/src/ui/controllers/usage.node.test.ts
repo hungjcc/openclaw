@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { __test, loadUsage, type UsageState } from "./usage.ts";
+import {
+  __test,
+  loadSessionLogs,
+  loadSessionTimeSeries,
+  loadUsage,
+  resetSessionUsageDetails,
+  type UsageState,
+} from "./usage.ts";
 
 type RequestFn = (method: string, params?: unknown) => Promise<unknown>;
 
@@ -8,6 +15,7 @@ function createState(request: RequestFn, overrides: Partial<UsageState> = {}): U
     client: { request } as unknown as UsageState["client"],
     connected: true,
     usageLoading: false,
+    usageRequestVersion: 0,
     usageResult: null,
     usageCostSummary: null,
     usageError: null,
@@ -17,13 +25,25 @@ function createState(request: RequestFn, overrides: Partial<UsageState> = {}): U
     usageSelectedDays: [],
     usageTimeSeries: null,
     usageTimeSeriesLoading: false,
+    usageTimeSeriesRequestVersion: 0,
     usageTimeSeriesCursorStart: null,
     usageTimeSeriesCursorEnd: null,
     usageSessionLogs: null,
     usageSessionLogsLoading: false,
+    usageSessionLogsRequestVersion: 0,
     usageTimeZone: "local",
     ...overrides,
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 function expectSpecificTimezoneCalls(request: ReturnType<typeof vi.fn>, startCall: number): void {
@@ -159,6 +179,145 @@ describe("usage controller date interpretation params", () => {
     expect(__test.shouldSendLegacyDateInterpretation(state)).toBe(false);
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe("usage loading", () => {
+  it("keeps only the latest usage results when a new range is requested mid-flight", async () => {
+    const firstSessions = createDeferred<unknown>();
+    const firstCost = createDeferred<unknown>();
+    const secondSessions = createDeferred<unknown>();
+    const secondCost = createDeferred<unknown>();
+    const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(
+      async (method, params) => {
+        const startDate = (params as { startDate?: string } | undefined)?.startDate;
+        if (startDate === "2026-02-17") {
+          return method === "sessions.usage" ? secondSessions.promise : secondCost.promise;
+        }
+        return method === "sessions.usage" ? firstSessions.promise : firstCost.promise;
+      },
+    );
+    const state = createState(request);
+    const latestUsageResult = {
+      sessions: [{ key: "latest" }],
+      aggregates: { messages: { total: 1 } },
+    };
+    const latestCostSummary = { daily: [], totals: { totalTokens: 2 } };
+
+    const firstLoad = loadUsage(state, {
+      startDate: "2026-02-16",
+      endDate: "2026-02-16",
+    });
+    const secondLoad = loadUsage(state, {
+      startDate: "2026-02-17",
+      endDate: "2026-02-17",
+    });
+
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(state.usageLoading).toBe(true);
+
+    secondSessions.resolve(latestUsageResult);
+    secondCost.resolve(latestCostSummary);
+    await secondLoad;
+
+    expect(state.usageResult).toEqual(latestUsageResult);
+    expect(state.usageCostSummary).toEqual(latestCostSummary);
+    expect(state.usageLoading).toBe(false);
+
+    firstSessions.resolve({
+      sessions: [{ key: "stale" }],
+      aggregates: { messages: { total: 99 } },
+    });
+    firstCost.resolve({ daily: [], totals: { totalTokens: 999 } });
+    await firstLoad;
+
+    expect(state.usageResult).toEqual(latestUsageResult);
+    expect(state.usageCostSummary).toEqual(latestCostSummary);
+    expect(state.usageLoading).toBe(false);
+  });
+});
+
+describe("usage detail loading", () => {
+  it("keeps only the latest time series response when session selection changes quickly", async () => {
+    const first = createDeferred<unknown>();
+    const second = createDeferred<unknown>();
+    const request = vi
+      .fn<(method: string, params?: unknown) => Promise<unknown>>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const state = createState(request);
+
+    const firstLoad = loadSessionTimeSeries(state, "session-a");
+    const secondLoad = loadSessionTimeSeries(state, "session-b");
+
+    second.resolve({ points: [{ timestamp: 2 }] });
+    await secondLoad;
+
+    expect(state.usageTimeSeries).toEqual({ points: [{ timestamp: 2 }] });
+    expect(state.usageTimeSeriesLoading).toBe(false);
+
+    first.resolve({ points: [{ timestamp: 1 }] });
+    await firstLoad;
+
+    expect(state.usageTimeSeries).toEqual({ points: [{ timestamp: 2 }] });
+    expect(state.usageTimeSeriesLoading).toBe(false);
+  });
+
+  it("keeps only the latest session logs response when session selection changes quickly", async () => {
+    const first = createDeferred<unknown>();
+    const second = createDeferred<unknown>();
+    const request = vi
+      .fn<(method: string, params?: unknown) => Promise<unknown>>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const state = createState(request);
+
+    const firstLoad = loadSessionLogs(state, "session-a");
+    const secondLoad = loadSessionLogs(state, "session-b");
+
+    second.resolve({ logs: [{ timestamp: 2, role: "assistant", content: "latest" }] });
+    await secondLoad;
+
+    expect(state.usageSessionLogs).toEqual([
+      { timestamp: 2, role: "assistant", content: "latest" },
+    ]);
+    expect(state.usageSessionLogsLoading).toBe(false);
+
+    first.resolve({ logs: [{ timestamp: 1, role: "user", content: "stale" }] });
+    await firstLoad;
+
+    expect(state.usageSessionLogs).toEqual([
+      { timestamp: 2, role: "assistant", content: "latest" },
+    ]);
+    expect(state.usageSessionLogsLoading).toBe(false);
+  });
+
+  it("invalidates in-flight detail requests when the selection is cleared", async () => {
+    const deferred = createDeferred<unknown>();
+    const request = vi.fn<(method: string, params?: unknown) => Promise<unknown>>(
+      async () => deferred.promise,
+    );
+    const state = createState(request);
+
+    const pending = loadSessionLogs(state, "session-a");
+    resetSessionUsageDetails(state);
+    deferred.resolve({ logs: [{ timestamp: 1, role: "user", content: "stale" }] });
+    await pending;
+
+    expect(state.usageSessionLogs).toBeNull();
+    expect(state.usageSessionLogsLoading).toBe(false);
+  });
+
+  it("reinitializes request versions when state-like objects start uninitialized", () => {
+    const state = createState(vi.fn(async () => ({})), {
+      usageTimeSeriesRequestVersion: Number.NaN,
+      usageSessionLogsRequestVersion: Number.NaN,
+    });
+
+    resetSessionUsageDetails(state);
+
+    expect(state.usageTimeSeriesRequestVersion).toBe(1);
+    expect(state.usageSessionLogsRequestVersion).toBe(1);
   });
 });
 
