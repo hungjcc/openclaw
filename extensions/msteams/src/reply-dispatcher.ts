@@ -108,19 +108,14 @@ export function createMSTeamsReplyDispatcher(params: {
   // window succeeds. (#29379)
   const pendingMessages: MSTeamsRenderedMessage[] = [];
 
-  const flushPendingMessages = async () => {
-    if (pendingMessages.length === 0) {
-      return;
-    }
-    // Drain the buffer before sending so re-entrant flushes don't double-send.
-    const toSend = pendingMessages.splice(0);
-    const ids = await sendMSTeamsMessages({
+  const sendMessages = async (messages: MSTeamsRenderedMessage[]): Promise<string[]> => {
+    return sendMSTeamsMessages({
       replyStyle: params.replyStyle,
       adapter: params.adapter,
       appId: params.appId,
       conversationRef: params.conversationRef,
       context: params.context,
-      messages: toSend,
+      messages,
       // Enable default retry/backoff for throttling/transient failures.
       retry: {},
       onRetry: (event) => {
@@ -133,6 +128,31 @@ export function createMSTeamsReplyDispatcher(params: {
       sharePointSiteId: params.sharePointSiteId,
       mediaMaxBytes,
     });
+  };
+
+  const flushPendingMessages = async () => {
+    if (pendingMessages.length === 0) {
+      return;
+    }
+    // Drain the buffer before sending so re-entrant flushes don't double-send.
+    const toSend = pendingMessages.splice(0);
+    let ids: string[];
+    try {
+      ids = await sendMessages(toSend);
+    } catch {
+      // Batch send failed (e.g. bad attachment on one message); retry each
+      // message individually so trailing blocks are not silently lost.
+      ids = [];
+      for (const msg of toSend) {
+        try {
+          const msgIds = await sendMessages([msg]);
+          ids.push(...msgIds);
+        } catch {
+          // Log individual failure but continue so remaining blocks are sent.
+          params.log.debug?.("individual message send failed, continuing with remaining blocks");
+        }
+      }
+    }
     if (ids.length > 0) {
       params.onSentMessageIds?.(ids);
     }
