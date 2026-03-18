@@ -242,6 +242,8 @@ export function parseCliJsonl(raw: string, backend: CliBackendConfig): CliOutput
       if (resultText) {
         return { text: resultText, sessionId, usage };
       }
+      // Empty result: still preserve session tracking data and stop searching
+      return { text: "", sessionId, usage };
     }
 
     const item = isRecord(parsed.item) ? parsed.item : null;
