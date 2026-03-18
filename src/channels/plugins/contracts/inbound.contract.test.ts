@@ -79,6 +79,7 @@ describe("channel inbound contract", () => {
       SenderName: "Alice",
       SenderId: "U1",
       SenderUsername: "alice",
+      SenderTag: "alice",
       Provider: "discord",
       Surface: "discord",
       MessageSid: "m1",

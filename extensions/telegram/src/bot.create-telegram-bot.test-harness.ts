@@ -5,6 +5,11 @@ import type { GetReplyOptions, ReplyPayload } from "openclaw/plugin-sdk/reply-ru
 import type { MockFn } from "openclaw/plugin-sdk/testing";
 import { beforeEach, vi } from "vitest";
 import type { TelegramBotDeps } from "./bot-deps.js";
+import {
+  Bot as RealBotCtor,
+  sequentialize as realSequentialize,
+  apiThrottler as realApiThrottler,
+} from "./bot.runtime.js";
 
 type AnyMock = ReturnType<typeof vi.fn>;
 type AnyAsyncMock = ReturnType<typeof vi.fn>;
@@ -13,12 +18,10 @@ type DispatchReplyWithBufferedBlockDispatcherFn =
 type DispatchReplyWithBufferedBlockDispatcherResult = Awaited<
   ReturnType<DispatchReplyWithBufferedBlockDispatcherFn>
 >;
-type DispatchReplyHarnessParams = Parameters<DispatchReplyWithBufferedBlockDispatcherFn>[0];
-
-const EMPTY_REPLY_COUNTS: DispatchReplyWithBufferedBlockDispatcherResult["counts"] = {
-  block: 0,
-  final: 0,
-  tool: 0,
+type DispatchReplyHarnessParams = {
+  ctx: Parameters<DispatchReplyWithBufferedBlockDispatcherFn>[0]["ctx"];
+  replyOptions?: Parameters<DispatchReplyWithBufferedBlockDispatcherFn>[0]["replyOptions"];
+  dispatcherOptions?: Parameters<DispatchReplyWithBufferedBlockDispatcherFn>[0]["dispatcherOptions"];
 };
 
 const { sessionStorePath } = vi.hoisted(() => ({
@@ -37,14 +40,12 @@ vi.doMock("openclaw/plugin-sdk/web-media", () => ({
   loadWebMedia,
 }));
 
-const { loadConfig } = vi.hoisted((): { loadConfig: MockFn<() => OpenClawConfig> } => ({
-  loadConfig: vi.fn(() => ({}) as OpenClawConfig),
+const { loadConfig } = vi.hoisted((): { loadConfig: AnyMock } => ({
+  loadConfig: vi.fn(() => ({})),
 }));
-const { resolveStorePathMock } = vi.hoisted(
-  (): { resolveStorePathMock: MockFn<TelegramBotDeps["resolveStorePath"]> } => ({
-    resolveStorePathMock: vi.fn((storePath?: string) => storePath ?? sessionStorePath),
-  }),
-);
+const { resolveStorePathMock } = vi.hoisted((): { resolveStorePathMock: AnyMock } => ({
+  resolveStorePathMock: vi.fn((storePath?: string) => storePath ?? sessionStorePath),
+}));
 
 export function getLoadConfigMock(): AnyMock {
   return loadConfig;
@@ -67,7 +68,7 @@ vi.doMock("openclaw/plugin-sdk/config-runtime", async (importOriginal) => {
 
 const { readChannelAllowFromStore, upsertChannelPairingRequest } = vi.hoisted(
   (): {
-    readChannelAllowFromStore: MockFn<TelegramBotDeps["readChannelAllowFromStore"]>;
+    readChannelAllowFromStore: AnyAsyncMock;
     upsertChannelPairingRequest: AnyAsyncMock;
   } => ({
     readChannelAllowFromStore: vi.fn(async () => [] as string[]),
@@ -111,7 +112,7 @@ const skillCommandsHoisted = vi.hoisted(() => ({
     async (params: DispatchReplyHarnessParams) => {
       const result: DispatchReplyWithBufferedBlockDispatcherResult = {
         queuedFinal: false,
-        counts: EMPTY_REPLY_COUNTS,
+        counts: { tool: 0, block: 0, final: 0 },
       };
       await params.dispatcherOptions?.typingCallbacks?.onReplyStart?.();
       const reply = await skillCommandsHoisted.replySpy(params.ctx, params.replyOptions);
@@ -141,10 +142,9 @@ vi.doMock("openclaw/plugin-sdk/reply-runtime", async (importOriginal) => {
 });
 
 const systemEventsHoisted = vi.hoisted(() => ({
-  enqueueSystemEventSpy: vi.fn<TelegramBotDeps["enqueueSystemEvent"]>(() => false),
+  enqueueSystemEventSpy: vi.fn(),
 }));
-export const enqueueSystemEventSpy: MockFn<TelegramBotDeps["enqueueSystemEvent"]> =
-  systemEventsHoisted.enqueueSystemEventSpy;
+export const enqueueSystemEventSpy: AnyMock = systemEventsHoisted.enqueueSystemEventSpy;
 
 vi.doMock("openclaw/plugin-sdk/infra-runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("openclaw/plugin-sdk/infra-runtime")>();
@@ -169,102 +169,137 @@ vi.doMock("./sent-message-cache.js", () => ({
 // vi.hoisted() so they are available when the hoisted factory runs, regardless
 // of module evaluation order across different test files.
 const grammySpies = vi.hoisted(() => ({
-  useSpy: vi.fn() as MockFn<(arg: unknown) => void>,
-  middlewareUseSpy: vi.fn() as AnyMock,
-  onSpy: vi.fn() as AnyMock,
-  stopSpy: vi.fn() as AnyMock,
-  commandSpy: vi.fn() as AnyMock,
-  botCtorSpy: vi.fn((_: string, __?: { client?: { fetch?: typeof fetch } }) => undefined),
-  answerCallbackQuerySpy: vi.fn(async () => undefined) as AnyAsyncMock,
-  sendChatActionSpy: vi.fn() as AnyMock,
-  editMessageTextSpy: vi.fn(async () => ({ message_id: 88 })) as AnyAsyncMock,
-  editMessageReplyMarkupSpy: vi.fn(async () => ({ message_id: 88 })) as AnyAsyncMock,
-  sendMessageDraftSpy: vi.fn(async () => true) as AnyAsyncMock,
-  setMessageReactionSpy: vi.fn(async () => undefined) as AnyAsyncMock,
-  setMyCommandsSpy: vi.fn(async () => undefined) as AnyAsyncMock,
-  getMeSpy: vi.fn(async () => ({
-    username: "openclaw_bot",
-    has_topics_enabled: true,
-  })) as AnyAsyncMock,
-  sendMessageSpy: vi.fn(async () => ({ message_id: 77 })) as AnyAsyncMock,
-  sendAnimationSpy: vi.fn(async () => ({ message_id: 78 })) as AnyAsyncMock,
-  sendPhotoSpy: vi.fn(async () => ({ message_id: 79 })) as AnyAsyncMock,
-  getFileSpy: vi.fn(async () => ({ file_path: "media/file.jpg" })) as AnyAsyncMock,
+  useSpy: vi.fn<(arg: unknown) => void>(),
+  middlewareUseSpy: vi.fn<(...args: unknown[]) => unknown>(),
+  onSpy: vi.fn<(...args: unknown[]) => unknown>(),
+  stopSpy: vi.fn<(...args: unknown[]) => unknown>(),
+  commandSpy: vi.fn<(...args: unknown[]) => unknown>(),
+  botCtorSpy: vi.fn<(token: string, options?: { client?: { fetch?: typeof fetch } }) => void>(),
+  answerCallbackQuerySpy: vi.fn<() => Promise<void>>(),
+  sendChatActionSpy: vi.fn<(...args: unknown[]) => unknown>(),
+  editMessageTextSpy:
+    vi.fn<
+      (
+        chatId: unknown,
+        messageId: unknown,
+        text: unknown,
+        params?: unknown,
+      ) => Promise<{ message_id: number }>
+    >(),
+  editMessageReplyMarkupSpy:
+    vi.fn<
+      (chatId: unknown, messageId: unknown, replyMarkup: unknown) => Promise<{ message_id: number }>
+    >(),
+  sendMessageDraftSpy: vi.fn<() => Promise<boolean>>(),
+  setMessageReactionSpy: vi.fn<() => Promise<void>>(),
+  setMyCommandsSpy: vi.fn<(commands: unknown) => Promise<void>>(),
+  getMeSpy: vi.fn<() => Promise<{ username: string; has_topics_enabled: boolean }>>(),
+  sendMessageSpy:
+    vi.fn<(chatId: unknown, text: unknown, params?: unknown) => Promise<{ message_id: number }>>(),
+  sendAnimationSpy: vi.fn<() => Promise<{ message_id: number }>>(),
+  sendPhotoSpy: vi.fn<() => Promise<{ message_id: number }>>(),
+  getFileSpy: vi.fn<() => Promise<{ file_path: string }>>(),
 }));
 
-export const useSpy: MockFn<(arg: unknown) => void> = grammySpies.useSpy;
-export const middlewareUseSpy: AnyMock = grammySpies.middlewareUseSpy;
-export const onSpy: AnyMock = grammySpies.onSpy;
-export const stopSpy: AnyMock = grammySpies.stopSpy;
-export const commandSpy: AnyMock = grammySpies.commandSpy;
-export const botCtorSpy: MockFn<
-  (token: string, options?: { client?: { fetch?: typeof fetch } }) => void
-> = grammySpies.botCtorSpy;
-export const answerCallbackQuerySpy: AnyAsyncMock = grammySpies.answerCallbackQuerySpy;
-export const sendChatActionSpy: AnyMock = grammySpies.sendChatActionSpy;
-export const editMessageTextSpy: AnyAsyncMock = grammySpies.editMessageTextSpy;
-export const editMessageReplyMarkupSpy: AnyAsyncMock = grammySpies.editMessageReplyMarkupSpy;
-export const sendMessageDraftSpy: AnyAsyncMock = grammySpies.sendMessageDraftSpy;
-export const setMessageReactionSpy: AnyAsyncMock = grammySpies.setMessageReactionSpy;
-export const setMyCommandsSpy: AnyAsyncMock = grammySpies.setMyCommandsSpy;
-export const getMeSpy: AnyAsyncMock = grammySpies.getMeSpy;
-export const sendMessageSpy: AnyAsyncMock = grammySpies.sendMessageSpy;
-export const sendAnimationSpy: AnyAsyncMock = grammySpies.sendAnimationSpy;
-export const sendPhotoSpy: AnyAsyncMock = grammySpies.sendPhotoSpy;
-export const getFileSpy: AnyAsyncMock = grammySpies.getFileSpy;
+export const {
+  useSpy,
+  middlewareUseSpy,
+  onSpy,
+  stopSpy,
+  commandSpy,
+  botCtorSpy,
+  answerCallbackQuerySpy,
+  sendChatActionSpy,
+  editMessageTextSpy,
+  editMessageReplyMarkupSpy,
+  sendMessageDraftSpy,
+  setMessageReactionSpy,
+  setMyCommandsSpy,
+  getMeSpy,
+  sendMessageSpy,
+  sendAnimationSpy,
+  sendPhotoSpy,
+  getFileSpy,
+} = grammySpies;
 
-const runnerHoisted = vi.hoisted(() => ({
-  sequentializeMiddleware: vi.fn(async (_ctx: unknown, next?: () => Promise<void>) => {
+const runnerHoisted = vi.hoisted(() => {
+  const sequentializeMiddleware = vi.fn(async (_ctx: unknown, next?: () => Promise<void>) => {
     if (typeof next === "function") {
       await next();
     }
-  }),
-  sequentializeSpy: vi.fn(() => runnerHoisted.sequentializeMiddleware),
-  throttlerSpy: vi.fn(() => "throttler"),
-}));
-export const sequentializeSpy: AnyMock = runnerHoisted.sequentializeSpy;
-export let sequentializeKey: ((ctx: unknown) => string) | undefined;
+  });
+  const sequentializeSpy = vi.fn<() => typeof sequentializeMiddleware>(
+    () => sequentializeMiddleware,
+  );
+  const throttlerSpy = vi.fn(() => "throttler");
+  return {
+    sequentializeMiddleware,
+    sequentializeSpy,
+    throttlerSpy,
+  };
+});
+export const sequentializeSpy: typeof runnerHoisted.sequentializeSpy =
+  runnerHoisted.sequentializeSpy;
+export let sequentializeKey: Parameters<RealSequentialize>[0] | undefined;
 export const throttlerSpy: AnyMock = runnerHoisted.throttlerSpy;
-export const telegramBotRuntimeForTest: {
-  Bot: new (token: string, options?: { client?: { fetch?: typeof fetch } }) => unknown;
-  sequentialize: (keyFn: (ctx: unknown) => string) => unknown;
-  apiThrottler: () => unknown;
-} = {
-  Bot: class {
-    api = {
-      config: { use: grammySpies.useSpy },
-      answerCallbackQuery: grammySpies.answerCallbackQuerySpy,
-      sendChatAction: grammySpies.sendChatActionSpy,
-      editMessageText: grammySpies.editMessageTextSpy,
-      editMessageReplyMarkup: grammySpies.editMessageReplyMarkupSpy,
-      sendMessageDraft: grammySpies.sendMessageDraftSpy,
-      setMessageReaction: grammySpies.setMessageReactionSpy,
-      setMyCommands: grammySpies.setMyCommandsSpy,
-      getMe: grammySpies.getMeSpy,
-      sendMessage: grammySpies.sendMessageSpy,
-      sendAnimation: grammySpies.sendAnimationSpy,
-      sendPhoto: grammySpies.sendPhotoSpy,
-      getFile: grammySpies.getFileSpy,
-    };
-    use = grammySpies.middlewareUseSpy;
-    on = grammySpies.onSpy;
-    stop = grammySpies.stopSpy;
-    command = grammySpies.commandSpy;
-    catch = vi.fn();
-    constructor(
-      public token: string,
-      public options?: { client?: { fetch?: typeof fetch } },
-    ) {
-      grammySpies.botCtorSpy(token, options);
-    }
-  },
-  sequentialize: (keyFn: (ctx: unknown) => string) => {
-    sequentializeKey = keyFn;
-    return runnerHoisted.sequentializeSpy();
-  },
-  apiThrottler: () => runnerHoisted.throttlerSpy(),
+type TelegramBotRuntimeForTest = NonNullable<
+  Parameters<typeof import("./bot.js").setTelegramBotRuntimeForTest>[0]
+>;
+
+type RealSequentialize = typeof realSequentialize;
+type RealApiThrottler = typeof realApiThrottler;
+
+const FakeTelegramBotCtor = class {
+  api = {
+    config: { use: grammySpies.useSpy },
+    answerCallbackQuery: grammySpies.answerCallbackQuerySpy,
+    sendChatAction: grammySpies.sendChatActionSpy,
+    editMessageText: grammySpies.editMessageTextSpy,
+    editMessageReplyMarkup: grammySpies.editMessageReplyMarkupSpy,
+    sendMessageDraft: grammySpies.sendMessageDraftSpy,
+    setMessageReaction: grammySpies.setMessageReactionSpy,
+    setMyCommands: grammySpies.setMyCommandsSpy,
+    getMe: grammySpies.getMeSpy,
+    sendMessage: grammySpies.sendMessageSpy,
+    sendAnimation: grammySpies.sendAnimationSpy,
+    sendPhoto: grammySpies.sendPhotoSpy,
+    getFile: grammySpies.getFileSpy,
+  };
+  use = grammySpies.middlewareUseSpy;
+  on = grammySpies.onSpy;
+  stop = grammySpies.stopSpy;
+  command = grammySpies.commandSpy;
+  catch = vi.fn();
+  constructor(
+    public token: string,
+    public options?: { client?: { fetch?: typeof fetch } },
+  ) {
+    (
+      grammySpies.botCtorSpy as unknown as (
+        token: string,
+        options?: { client?: { fetch?: typeof fetch } },
+      ) => void
+    )(token, options);
+  }
 };
-export const telegramBotDepsForTest: TelegramBotDeps = {
+
+const fakeSequentialize: RealSequentialize = ((keyFn: Parameters<typeof realSequentialize>[0]) => {
+  sequentializeKey = keyFn;
+  return runnerHoisted.sequentializeMiddleware;
+}) as unknown as RealSequentialize;
+
+const fakeApiThrottler: RealApiThrottler = () => {
+  const throttle = runnerHoisted.throttlerSpy();
+  return throttle as unknown as ReturnType<typeof realApiThrottler>;
+};
+
+export const telegramBotRuntimeForTest: TelegramBotRuntimeForTest = {
+  Bot: FakeTelegramBotCtor as unknown as TelegramBotRuntimeForTest["Bot"],
+  sequentialize: fakeSequentialize,
+  apiThrottler: fakeApiThrottler,
+};
+
+export const telegramBotDepsForTest = {
   loadConfig,
   resolveStorePath: resolveStorePathMock,
   readChannelAllowFromStore,
@@ -272,7 +307,7 @@ export const telegramBotDepsForTest: TelegramBotDeps = {
   dispatchReplyWithBufferedBlockDispatcher,
   listSkillCommandsForAgents,
   wasSentByBot,
-};
+} as TelegramBotDeps;
 
 vi.doMock("./bot.runtime.js", () => telegramBotRuntimeForTest);
 
@@ -370,7 +405,7 @@ beforeEach(() => {
     async (params: DispatchReplyHarnessParams) => {
       const result: DispatchReplyWithBufferedBlockDispatcherResult = {
         queuedFinal: false,
-        counts: EMPTY_REPLY_COUNTS,
+        counts: { tool: 0, block: 0, final: 0 },
       };
       await params.dispatcherOptions?.typingCallbacks?.onReplyStart?.();
       const reply = await replySpy(params.ctx, params.replyOptions);

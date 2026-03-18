@@ -1,11 +1,12 @@
-import { getActiveWebListener } from "../../../extensions/whatsapp/runtime-api.js";
+import { getActiveWebListener } from "../../../extensions/whatsapp/src/active-listener.js";
 import {
   getWebAuthAgeMs,
   logoutWeb,
   logWebSelfId,
   readWebSelfId,
   webAuthExists,
-} from "../../../extensions/whatsapp/runtime-api.js";
+} from "../../../extensions/whatsapp/src/auth-store.js";
+import { monitorWebChannel as monitorWebChannelImpl } from "../../../extensions/whatsapp/src/auto-reply/monitor.js";
 import {
   createLazyRuntimeMethodBinder,
   createLazyRuntimeSurface,
@@ -53,8 +54,7 @@ const waitForWebLoginLazy: PluginRuntime["channel"]["whatsapp"]["waitForWebLogin
 const monitorWebChannelLazy: PluginRuntime["channel"]["whatsapp"]["monitorWebChannel"] = async (
   ...args
 ) => {
-  const { monitorWebChannel } = await loadWebChannel();
-  return monitorWebChannel(...args);
+  return await monitorWebChannelImpl(...args);
 };
 
 const handleWhatsAppActionLazy: PluginRuntime["channel"]["whatsapp"]["handleWhatsAppAction"] =
@@ -66,7 +66,6 @@ const handleWhatsAppActionLazy: PluginRuntime["channel"]["whatsapp"]["handleWhat
 let webLoginQrPromise: Promise<
   typeof import("../../../extensions/whatsapp/login-qr-api.js")
 > | null = null;
-let webChannelPromise: Promise<typeof import("../../channels/web/index.js")> | null = null;
 let whatsappActionsPromise: Promise<
   typeof import("../../../extensions/whatsapp/action-runtime.runtime.js")
 > | null = null;
@@ -74,11 +73,6 @@ let whatsappActionsPromise: Promise<
 function loadWebLoginQr() {
   webLoginQrPromise ??= import("../../../extensions/whatsapp/login-qr-api.js");
   return webLoginQrPromise;
-}
-
-function loadWebChannel() {
-  webChannelPromise ??= import("../../channels/web/index.js");
-  return webChannelPromise;
 }
 
 function loadWhatsAppActions() {
