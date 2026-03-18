@@ -416,11 +416,19 @@ export function normalizeCronJobInput(
           typeof base.preHook.timeoutSeconds === "number" &&
           Number.isFinite(base.preHook.timeoutSeconds)
         ) {
-          normalized.timeoutSeconds = Math.max(1, Math.floor(base.preHook.timeoutSeconds));
+          normalized.timeoutSeconds = Math.min(
+            300,
+            Math.max(1, Math.floor(base.preHook.timeoutSeconds)),
+          );
         }
         next.preHook = normalized;
+      } else {
+        // Empty command clears the hook (same as null).
+        next.preHook = null;
       }
-    } else if (base.preHook === null || base.preHook === undefined) {
+    } else if (base.preHook === null) {
+      next.preHook = null;
+    } else if (base.preHook === undefined) {
       delete next.preHook;
     }
   }

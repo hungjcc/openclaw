@@ -12,10 +12,15 @@ export type PreHookResult =
 
 export const PRE_HOOK_SKIP_EXIT_CODE = 10;
 export const DEFAULT_PRE_HOOK_TIMEOUT_SECONDS = 30;
+export const MAX_PRE_HOOK_TIMEOUT_SECONDS = 300;
 const MAX_OUTPUT_BYTES = 64 * 1024;
 
 export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> {
-  const timeoutMs = (config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS) * 1000;
+  const timeoutMs =
+    Math.min(
+      config.timeoutSeconds ?? DEFAULT_PRE_HOOK_TIMEOUT_SECONDS,
+      MAX_PRE_HOOK_TIMEOUT_SECONDS,
+    ) * 1000;
 
   return new Promise<PreHookResult>((resolve) => {
     execFile(
@@ -33,7 +38,7 @@ export async function runPreHook(config: PreHookConfig): Promise<PreHookResult> 
             ? error.code
             : ((error as NodeJS.ErrnoException & { status?: number }).status ?? 1);
 
-        if (error.killed || (error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
+        if (error.killed) {
           resolve({
             outcome: "error",
             exitCode,

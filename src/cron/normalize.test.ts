@@ -519,14 +519,6 @@ describe("preHook normalization", () => {
     expect(normalized.preHook).toEqual({ command: "echo ok", timeoutSeconds: 15 });
   });
 
-  it("strips empty command", () => {
-    const normalized = normalizeCronJobCreate({
-      ...base,
-      preHook: { command: "  " },
-    }) as unknown as Record<string, unknown>;
-    expect(normalized.preHook).toBeUndefined();
-  });
-
   it("clamps timeoutSeconds to positive integer", () => {
     const normalized = normalizeCronJobCreate({
       ...base,
@@ -541,8 +533,15 @@ describe("preHook normalization", () => {
     const normalized = normalizeCronJobPatch({
       preHook: null,
     }) as unknown as Record<string, unknown>;
-    expect(normalized.preHook).toBeUndefined();
-    expect("preHook" in normalized).toBe(false);
+    expect(normalized.preHook).toBeNull();
+  });
+
+  it("empty command clears preHook", () => {
+    const normalized = normalizeCronJobCreate({
+      ...base,
+      preHook: { command: "  " },
+    }) as unknown as Record<string, unknown>;
+    expect(normalized.preHook).toBeNull();
   });
 
   it("omits timeoutSeconds when not a number", () => {
