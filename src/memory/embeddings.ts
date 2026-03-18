@@ -230,6 +230,23 @@ function getPluginEmbeddingProvidersSync(
       }
       const normalizedId = normalizeProviderId(p.id);
 
+      // Resolve provider config baseUrl/headers, merging with remote settings
+      const providerConfig = options.config.models?.providers?.[normalizedId];
+      const providerHeaders = providerConfig?.headers;
+      const sanitizedHeaders: Record<string, string> = {};
+      if (providerHeaders) {
+        for (const [key, value] of Object.entries(providerHeaders)) {
+          if (typeof value === "string") {
+            sanitizedHeaders[key] = value;
+          }
+        }
+      }
+      const resolvedBaseUrl = options.remote?.baseUrl ?? providerConfig?.baseUrl;
+      const resolvedHeaders = {
+        ...sanitizedHeaders,
+        ...options.remote?.headers,
+      };
+
       // Helper to resolve API key from config or auth sources
       const resolveApiKey = async (): Promise<string> => {
         const resolvedApiKey = resolveMemorySecretInputString({
@@ -269,8 +286,8 @@ function getPluginEmbeddingProvidersSync(
               text,
               model: options.model,
               apiKey,
-              baseUrl: options.remote?.baseUrl,
-              headers: options.remote?.headers,
+              baseUrl: resolvedBaseUrl,
+              headers: resolvedHeaders,
               timeoutMs: getEmbeddingTimeout(options),
               fetchFn,
             });
@@ -281,8 +298,8 @@ function getPluginEmbeddingProvidersSync(
               texts: [text],
               model: options.model,
               apiKey,
-              baseUrl: options.remote?.baseUrl,
-              headers: options.remote?.headers,
+              baseUrl: resolvedBaseUrl,
+              headers: resolvedHeaders,
               timeoutMs: getEmbeddingTimeout(options),
               fetchFn,
             });
@@ -303,8 +320,8 @@ function getPluginEmbeddingProvidersSync(
               texts,
               model: options.model,
               apiKey,
-              baseUrl: options.remote?.baseUrl,
-              headers: options.remote?.headers,
+              baseUrl: resolvedBaseUrl,
+              headers: resolvedHeaders,
               timeoutMs: getEmbeddingTimeout(options),
               fetchFn,
             });
@@ -317,13 +334,12 @@ function getPluginEmbeddingProvidersSync(
           }
           const results = await Promise.all(
             texts.map(async (text) => {
-              const apiKey = await resolveApiKey();
               const result = await embedFn({
                 text,
                 model: options.model,
                 apiKey,
-                baseUrl: options.remote?.baseUrl,
-                headers: options.remote?.headers,
+                baseUrl: resolvedBaseUrl,
+                headers: resolvedHeaders,
                 timeoutMs: getEmbeddingTimeout(options),
                 fetchFn,
               });
@@ -345,8 +361,8 @@ function getPluginEmbeddingProvidersSync(
               }[],
               model: options.model,
               apiKey,
-              baseUrl: options.remote?.baseUrl,
-              headers: options.remote?.headers,
+              baseUrl: resolvedBaseUrl,
+              headers: resolvedHeaders,
               timeoutMs: getEmbeddingTimeout(options),
               fetchFn,
             });
@@ -360,19 +376,13 @@ function getPluginEmbeddingProvidersSync(
   return providers;
 }
 
-function getPluginEmbeddingProviders(
-  options: EmbeddingProviderOptions,
-): Record<string, EmbeddingProvider> {
-  return getPluginEmbeddingProvidersSync(options);
-}
-
 export async function createEmbeddingProvider(
   options: EmbeddingProviderOptions,
 ): Promise<EmbeddingProviderResult> {
   const requestedProvider = options.provider;
   const fallback = options.fallback;
 
-  const pluginProviders = getPluginEmbeddingProviders(options);
+  const pluginProviders = getPluginEmbeddingProvidersSync(options);
   const normalizedRequested = normalizeProviderId(requestedProvider);
 
   const createProvider = async (id: string) => {
@@ -497,9 +507,10 @@ export async function createEmbeddingProvider(
             providerUnavailableReason: `${reason}\n\nFallback to ${fallback} failed: ${fallbackReason}`,
           };
         }
-        // Other errors - throw primary error
-        const wrapped = new Error(reason) as Error & { cause?: unknown };
-        wrapped.cause = primaryErr;
+        // Other errors - preserve both errors
+        const combinedReason = `${reason}\n\nFallback to ${fallback} failed: ${fallbackReason}`;
+        const wrapped = new Error(combinedReason) as Error & { cause?: unknown };
+        wrapped.cause = fallbackErr;
         throw wrapped;
       }
     }

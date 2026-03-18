@@ -685,6 +685,17 @@ export async function textToSpeech(params: {
 
   const providerOrder: string[] = [];
   const addedProviders = new Set<string>();
+
+  // If primary is a custom plugin, ensure it heads the provider order
+  if (
+    normalizedPrimary &&
+    !builtinSet.has(normalizedPrimary) &&
+    pluginTtsRegistry.has(normalizedPrimary)
+  ) {
+    providerOrder.push(normalizedPrimary);
+    addedProviders.add(normalizedPrimary);
+  }
+
   for (const p of legacyProviders) {
     if (!addedProviders.has(p.toLowerCase())) {
       providerOrder.push(p);
@@ -829,6 +840,17 @@ export async function textToSpeechTelephony(params: {
 
   const providers: string[] = [];
   const addedProviders = new Set<string>();
+
+  // If user provider is a custom plugin, ensure it heads the provider order
+  if (
+    normalizedUser &&
+    !builtinSetTelephony.has(normalizedUser) &&
+    pluginTtsRegistry.has(normalizedUser)
+  ) {
+    providers.push(normalizedUser);
+    addedProviders.add(normalizedUser);
+  }
+
   for (const p of legacyProviders) {
     if (!addedProviders.has(p.toLowerCase())) {
       providers.push(p);
