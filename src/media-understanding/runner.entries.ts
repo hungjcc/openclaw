@@ -452,9 +452,12 @@ export async function runProviderEntry(params: {
   const pluginRegistry = getActivePluginRegistry();
   const isPluginProvider =
     pluginRegistry?.providers.some(
-      (pluginEntry: { provider: { id: string; capabilities?: string[] } }) =>
-        normalizeMediaProviderId(pluginEntry.provider.id) === providerId &&
-        pluginEntry.provider.capabilities?.some((c) => c === capability),
+      (pluginEntry: { provider: { id: string; capabilities?: unknown } }) => {
+        const normalizedId = normalizeMediaProviderId(pluginEntry.provider.id);
+        const caps = pluginEntry.provider.capabilities;
+        const capabilitiesArray = Array.isArray(caps) ? caps : [];
+        return normalizedId === providerId && capabilitiesArray.some((c) => c === capability);
+      },
     ) ?? false;
 
   if (capability === "image") {
