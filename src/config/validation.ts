@@ -475,7 +475,8 @@ function validateConfigObjectWithPluginsBase(
     "ollama",
     "auto",
   ]);
-  const knownMemoryFallbacks = new Set([...knownMemoryProviders, "none"]);
+  const knownMemoryFallbacks = new Set([...knownMemoryProviders].filter((p) => p !== "auto"));
+  knownMemoryFallbacks.add("none");
 
   const getKnownPluginIds = (): Set<string> => {
     return ensureKnownIds();

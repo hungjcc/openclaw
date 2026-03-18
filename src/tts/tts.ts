@@ -23,10 +23,10 @@ import type {
   TtsModelOverrideConfig,
 } from "../config/types.tts.js";
 import { logVerbose } from "../globals.js";
-import { isVoiceCompatibleAudio } from "../media/audio.js";
 import { resolveProxyFetchFromEnv } from "../infra/net/proxy-fetch.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { stripMarkdown } from "../line/markdown-to-line.js";
+import { isVoiceCompatibleAudio } from "../media/audio.js";
 import { CONFIG_DIR, resolveUserPath } from "../utils.js";
 import {
   getSpeechProvider,
@@ -665,7 +665,7 @@ export async function textToSpeech(params: {
     return { success: false, error: setup.error };
   }
 
-  const { config } = setup;
+  const { config, providers: legacyProviders } = setup;
   const channelId = resolveChannelId(params.channel);
   const target = channelId && VOICE_BUBBLE_CHANNELS.has(channelId) ? "voice-note" : "audio-file";
 
@@ -683,12 +683,20 @@ export async function textToSpeech(params: {
     }
   }
 
-  const otherBuiltins = TTS_PROVIDERS.filter((p) => p.toLowerCase() !== normalizedPrimary);
   const providerOrder: string[] = [];
-  if (primaryProvider) {
-    providerOrder.push(primaryProvider);
+  const addedProviders = new Set<string>();
+  for (const p of legacyProviders) {
+    if (!addedProviders.has(p.toLowerCase())) {
+      providerOrder.push(p);
+      addedProviders.add(p.toLowerCase());
+    }
   }
-  providerOrder.push(...customPlugins, ...otherBuiltins);
+  for (const p of customPlugins) {
+    if (!addedProviders.has(p.toLowerCase())) {
+      providerOrder.push(p);
+      addedProviders.add(p.toLowerCase());
+    }
+  }
 
   const errors: string[] = [];
 
@@ -806,7 +814,7 @@ export async function textToSpeechTelephony(params: {
     return { success: false, error: setup.error };
   }
 
-  const { config } = setup;
+  const { config, providers: legacyProviders } = setup;
   const pluginTtsRegistry = await buildPluginTtsRegistry();
   const userProvider = getTtsProvider(config, params.prefsPath ?? resolveTtsPrefsPath(config));
   const normalizedUser = userProvider ? normalizeProviderId(userProvider) : undefined;
@@ -819,12 +827,20 @@ export async function textToSpeechTelephony(params: {
     }
   }
 
-  const otherBuiltinsTelephony = TTS_PROVIDERS.filter((p) => p.toLowerCase() !== normalizedUser);
   const providers: string[] = [];
-  if (userProvider) {
-    providers.push(userProvider);
+  const addedProviders = new Set<string>();
+  for (const p of legacyProviders) {
+    if (!addedProviders.has(p.toLowerCase())) {
+      providers.push(p);
+      addedProviders.add(p.toLowerCase());
+    }
   }
-  providers.push(...customPluginsTelephony, ...otherBuiltinsTelephony);
+  for (const p of customPluginsTelephony) {
+    if (!addedProviders.has(p.toLowerCase())) {
+      providers.push(p);
+      addedProviders.add(p.toLowerCase());
+    }
+  }
 
   const errors: string[] = [];
 

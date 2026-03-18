@@ -151,5 +151,5 @@ export type MediaUnderstandingProvider = {
   transcribeAudio?: (req: AudioTranscriptionRequest) => Promise<AudioTranscriptionResult>;
   describeVideo?: (req: VideoDescriptionRequest) => Promise<VideoDescriptionResult>;
   describeImage?: (req: ImageDescriptionRequest) => Promise<ImageDescriptionResult>;
-  describeImages?: (req: ImagesDescriptionRequest) => Promise<ImagesDescriptionResult>;
+  describeImages?: (req: ImagesDescriptionRequest) => Promise<ImageDescriptionResult>;
 };

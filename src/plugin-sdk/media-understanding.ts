@@ -7,7 +7,6 @@ export type {
   ImageDescriptionResult,
   ImagesDescriptionInput,
   ImagesDescriptionRequest,
-  ImagesDescriptionResult,
   MediaUnderstandingProvider,
   VideoDescriptionRequest,
   VideoDescriptionResult,
